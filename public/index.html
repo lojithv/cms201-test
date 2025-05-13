@@ -64,11 +64,15 @@
 			return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 		};
 
-		async function getUploadLink(hash) {
-			const response = await fetch(`/api/uploadImageURL?path=${hash}?toDelete=true`);
-			if (!response.ok)
-				throw new Error("Error: retrieving upload url failed.");
-			return await response.text();
+		async function fetch200(url, options) {
+			const response = await fetch(url, options);
+			if (response.ok)
+				return response;
+			throw new Error(response.status + ": " + response.statusText);
+		}
+
+		function ok(target, message) {
+			target.dispatchEvent(Object.assign(new Event("ok", { bubbles: true }), { message }));
 		}
 
 		async function updateImageForm(blob) {
@@ -82,9 +86,9 @@
 			try {
 				exists = (await fetch(`https://imagedelivery.net/Ckr7BDu4VxTAuei58W1b7Q/${hash}/public`, { method: 'HEAD' })).ok;
 			} catch (e) { }
-			emit("ok", "Image Checked");
 			document.querySelector("#addImage input[name='imageExists']").checked = exists;
 			document.querySelector("#addImage button[type='submit']").toggleAttribute("disabled", exists);
+			ok(this, "Image Checked");
 		}
 
 		async function waitForOkError(href, timeout = 30000) {
@@ -103,24 +107,18 @@
 			}
 			if (Date.now() >= timeout)
 				throw new Error("Error: Timed out waiting for tab to load expected content");
-			emit('ok', tab.document.body.textContent);
+			ok(this, tab.document.body.textContent);
 			tab.close();
 		}
 
 		async function addPost(json) {
 			const uid = Math.floor(Math.random() * 100000000); //todo do this in the worker?
-			const response = await fetch('api/event/', {
+			const result = await fetch200('api/event/', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ uid, ...json }),
 			});
-			if (response.ok)
-				return emit('ok', JSON.stringify(await response.json()));
-			throw new Error("Error creating post 1: " + response.statusText);
-		}
-
-		function emit(type, message) {
-			dispatchEvent(new CustomEvent(type, { detail: { message } }));
+			ok(this, JSON.stringify(await result.json()));
 		}
 
 		const list = document.getElementById('list');
@@ -132,7 +130,7 @@
 			const resp = await fetch('/api/snap?name=all');
 			jsonList = await resp.json();
 			list.textContent = JSON.stringify(jsonList, null, 2);
-			emit('ok', "init ok.");
+			ok(document.body, "init ok.");
 		})();
 
 		for (const el of document.querySelectorAll("a[wait-for-success]"))
@@ -154,14 +152,12 @@
 			const file = this.children[0].files[0];
 			if (!file)
 				return alert("Please select a file."), this.children[0].click();
-			const resp = await fetch(this.action, {
+			const resp = await fetch200(this.action, {
 				method: this.method,
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(JSON.parse(await file.text()))
 			});
-			if (resp.ok)
-				return emit('ok', await resp.text());
-			throw new Error("error. requesting rollback");
+			ok(this, await resp.text());
 		});
 
 		document.querySelector("#addPost").addEventListener("submit", async function (e) {
@@ -172,14 +168,11 @@
 		document.querySelector("#addImage").addEventListener("submit", async function (e) {
 			e.preventDefault();
 			const formData = new FormData(this);
-			const uploadURL = await getUploadLink(formData.get("imageHash"));
+			const uploadURL = await (await fetch200(`/api/uploadImageURL?path=${formData.get("imageHash")}?toDelete=true`)).text();
 			const uploadForm = new FormData();
 			uploadForm.append("file", formData.get("image"));
-			const response = await fetch(uploadURL, { method: "POST", body: uploadForm });
-			if (!response.ok)
-				throw new Error("Error: adding image");
-			result.textContent = "";
-			emit('ok', 'Image Added to Image Server');
+			await fetch200(uploadURL, { method: "POST", body: uploadForm });
+			ok(this, 'Image Added to Image Server')
 		});
 
 		document.querySelector("button[href='/api/events']").addEventListener("click", async function (e) {
@@ -191,8 +184,9 @@
 			result.textContent = JSON.stringify(data, null, 2);
 		});
 
-		addEventListener("unhandledrejection", (e) => result.textContent = e.reason);
-		addEventListener("ok", (e) => result.textContent = `ok. ${e.detail.message}`);
+		window.addEventListener("error", e => result.textContent = `error. ${e.error.message}`);
+		window.addEventListener("unhandledrejection", e => result.textContent = `error. ${e.reason}`);
+		window.addEventListener("ok", e => result.textContent = `ok. ${e.message}`);	
 	</script>
 </body>
 
