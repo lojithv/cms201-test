@@ -87,6 +87,9 @@ export class EventsSnaps extends DurableObject {
   // }
 
   async requestRollback(newEvents, host, settings) {
+    if (!newEvents ||
+      !newEvents.every(({ id, timestamp, email, json }) => id && timestamp && email && json))
+      throw "invalid newEvents in rollback request";
     const { domain, backup: { emails } } = settings;
     const lastId = this.getLastEventId();
     const data = {
