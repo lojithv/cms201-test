@@ -53,23 +53,15 @@
         result = await frame.click("a[href='/api/backup']", "#result");
         if (!result.textContent.startsWith("ok."))
           throw new Error("backup failed");
-        result = frame.observeChange("#result");
+
         const jsonBlob = await (await fetch("data/tegntv_data4.json")).blob();
         const jsonFile = new File([jsonBlob], "tegntv_data4.json", { type: "application/json" });
-        await frame.transferFile('#requestRollback input[type="file"]', jsonFile);
-        result = await result;
+        frame.transferFile('#requestRollback input[type="file"]', jsonFile);
         result = await frame.click("#requestRollback button[type='submit']", "#result");
         if (!result.textContent.startsWith("ok."))
           throw new Error("rollback request failed");
-        // open window and wait for it to close //openExternal
-        await new Promise(r => setTimeout(r, 2500));
-        const otherWindow = window.open("https://mail.google.com/mail/u/0/#search/from:onboarding@resend.dev+subject:confirmation");
-        for (let i = 0; i < 10; i++) {
-          await new Promise(r => setTimeout(r, i + 1000));
-          if (otherWindow.closed)
-            break;
-        }
-        //wait for the window above to be closed;
+        await new Promise(r => setTimeout(r, 2000));
+        await frame.openExternal("https://mail.google.com/mail/u/0");
         result = await frame.click('button[href="/api/events"]', "#result");
         const data = result.textContent;
         const shouldBe = await jsonBlob.text();
