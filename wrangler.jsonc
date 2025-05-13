@@ -1,0 +1,35 @@
+/* https://developers.cloudflare.com/workers/wrangler/configuration/ */
+{
+	/*"$schema": "node_modules/wrangler/config-schema.json", unnecessary*/
+	"name": "cms101",
+	"main": "src/index.js",
+	"compatibility_date": "2025-04-23",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": "./public"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"class_name": "EventsSnaps",
+				"name": "EVENTS_SNAPS"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"new_sqlite_classes": [
+				"EventsSnaps"
+			],
+			"tag": "v1"
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"triggers": {
+		"crons": [
+			"* */6 * * *"
+		]
+	}
+}
