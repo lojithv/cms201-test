@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<body>
+  <test-e2e name="loginLogout" page="/">
+    <script type="module" test>
+      export default async function (frame) {
+        let result = await frame.click("a[href='/auth/logout']", "#result");
+        if (!result.textContent.startsWith("ok."))
+          throw new Error("logout 1 failed");
+        result = await frame.click("a[href='/auth/login']", "#result");
+        if (!result.textContent.startsWith("ok."))
+          throw new Error("login failed");
+        result = await frame.click("a[href='/auth/logout']", "#result");
+        if (!result.textContent.startsWith("ok."))
+          throw new Error("logout 2 failed");
+        return "hello sunshine";
+      }
+    </script>
+    <script expected>"hello sunshine"</script>
+  </test-e2e>
+  <test-e2e name="addPost" page="/" auto-off>
+    <script type="module" test>
+      export default async function (frame) {
+        let result = await frame.click("a[href='/auth/checkLogin']", "#result");
+        if (!result.textContent.startsWith("ok."))
+          throw new Error("login failed");
+        const document = frame.document();
+        const list = JSON.parse(document.querySelector("#list").textContent);
+        const initialPostsLength = Object.values(list.value).length;
+        document.querySelector("input[name='title']").value = "TEST";
+        document.querySelector("textarea[name='content']").value = "TEST";
+        document.querySelector("input[name='tags']").value = "#test";
+        result = await frame.click("button[type='submit']", "#result");
+        let [msg, ...data] = result.textContent.split(/\s/);
+        if (msg !== "ok.")
+          throw new Error("adding post failed: " + result.textContent);
+        data = data.join(" ");
+        const newPostsLength = Object.values(JSON.parse(data)).length;
+        if (initialPostsLength === newPostsLength)
+          throw new Error("no post added.");
+        return "hello autobots";
+      }
+    </script>
+    <script expected>"hello autobots"</script>
+  </test-e2e>
+  <test-e2e name="upBackRoll" page="/">
+    <script type="module" test>
+      export default async function (frame) {
+        let result = await frame.click("a[href='/auth/checkLogin']", "#result");
+        if (!result.textContent.startsWith("ok."))
+          throw new Error("login failed");
+        result = await frame.click("a[href='/api/backup']", "#result");
+        if (!result.textContent.startsWith("ok."))
+          throw new Error("backup failed");
+        result = frame.observeChange("#result");
+        const jsonBlob = await (await fetch("data/tegntv_data4.json")).blob();
+        const jsonFile = new File([jsonBlob], "tegntv_data4.json", { type: "application/json" });
+        await frame.transferFile('#requestRollback input[type="file"]', jsonFile);
+        result = await result;
+        result = await frame.click("#requestRollback button[type='submit']", "#result");
+        if (!result.textContent.startsWith("ok."))
+          throw new Error("rollback request failed");
+        result = await frame.click("a[href='https://mail.google.com/mail/u/0/#search/from:onboarding@resend.dev+subject:rollback confirmation']", "#result");
+        //todo we need to check that the events in the jsonBlob are the same as the events now stored in the system.
+        return "olleh dlrow";
+      }
+    </script>
+    <script expected>"olleh dlrow"</script>
+  </test-e2e>
+  <test-e2e name="addExistingImage" page="/">
+    <script type="module" test>
+      export default async function (frame) {
+
+        async function getExistingImageFile(url) {
+          const blob = await (await fetch(url)).blob();
+          return new File([blob], "tempFile.png", { type: blob.type || "image/png" });
+        }
+
+        const file = await getExistingImageFile(`https://imagedelivery.net/Ckr7BDu4VxTAuei58W1b7Q/6aVXVjlw50jGYKNv_5e5lV0rLM9hh5yeen0VpHwtwc4/public`);
+        const hashEl = frame.observeChange("#addImage [type='hidden']");
+        await frame.transferFile('#addImage input[type="file"]', file);
+        return (await hashEl).value;
+      }
+    </script>
+    <script expected>"6aVXVjlw50jGYKNv_5e5lV0rLM9hh5yeen0VpHwtwc4"</script>
+  </test-e2e>
+  <test-e2e name="addNewImage" page="/">
+    <script type="module" test>
+      export default async function (frame) {
+
+        async function generateSimpleSVG(color = Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0')) {
+          const svg = `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><circle cx="100" cy="100" r="50" fill="#${color}" /></svg>`;
+          const dataLink = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg).replace(/'/g, '%27').replace(/"/g, '%22')}`
+          const blob = await (await fetch(dataLink)).blob();
+          return new File([blob], "tempFile.png", { type: blob.type || "image/png" });
+        }
+
+        const file = await generateSimpleSVG();
+        const hashEl = frame.observeChange("#addImage [type='hidden']");
+        await frame.transferFile('#addImage input[type="file"]', file);
+        await hashEl;
+        return frame.document().querySelector("#addImage input[name='imageExists']").checked;
+      }
+    </script>
+    <script expected>false</script>
+  </test-e2e>
+
+  <test-e2e name="addImage" page="/">
+    <script type="module" test>
+      async function generateSimpleSVG(color = Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0')) {
+        const svg = `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><circle cx="100" cy="100" r="50" fill="#${color}" /></svg>`;
+        const dataLink = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg).replace(/'/g, '%27').replace(/"/g, '%22')}`
+        const blob = await (await fetch(dataLink)).blob();
+        return new File([blob], "tempFile.png", { type: blob.type || "image/png" });
+      }
+
+      export default async function (frame) {
+        let result = await frame.click("a[href='/auth/checkLogin']", "#result");
+        if (!result.textContent.startsWith("ok."))
+          throw new Error("login failed");
+        const file = await generateSimpleSVG();
+        result = frame.observeChange("#result");
+        await frame.transferFile('#addImage input[type="file"]', file);
+        result = await result;
+        if (frame.document().querySelector("#addImage input[name='imageExists']").checked)
+          throw new Error("image already exists.");
+        result = await frame.click("#addImage button[type='submit']", "#result");
+        if (!result.textContent.startsWith("ok."))
+          throw new Error("adding image failed");
+        return "hallo e-mage";
+      } 
+    </script>
+    <script expected>"hallo e-mage"</script>
+  </test-e2e>
+  <script type="module" src="https://cdn.jsdelivr.net/gh/orstavik/TestHTML@2.1.1/TestE2E.js"></script>
+</body>
+<!-- 
+  Empty posts TEST:
+  1. try to run addPost when there is no posts in the system.
+  2. get the list of posts when there are no posts in the system.
+-->
+
+</html>
