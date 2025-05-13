@@ -4,7 +4,7 @@
 <body>
   <test-e2e name="loginLogout" page="/">
     <script type="module" test>
-      export default async function (frame) {
+      window.testLoginLogout = async function (frame) {
         let result = await frame.click("a[href='/auth/logout']", "#result");
         if (!result.textContent.startsWith("ok."))
           throw new Error("logout 1 failed");
@@ -21,7 +21,7 @@
   </test-e2e>
   <test-e2e name="addPost" page="/" auto-off>
     <script type="module" test>
-      export default async function (frame) {
+      window.testAddPost = async function (frame) {
         let result = await frame.click("a[href='/auth/checkLogin']", "#result");
         if (!result.textContent.startsWith("ok."))
           throw new Error("login failed");
@@ -45,8 +45,8 @@
     <script expected>"hello autobots"</script>
   </test-e2e>
   <test-e2e name="upBackRoll" page="/">
-    <script type="module" test>
-      export default async function (frame) {
+    <script test>
+      window.testUpBackRoll = async function (frame) {
         let result = await frame.click("a[href='/auth/checkLogin']", "#result");
         if (!result.textContent.startsWith("ok."))
           throw new Error("login failed");
@@ -61,16 +61,29 @@
         result = await frame.click("#requestRollback button[type='submit']", "#result");
         if (!result.textContent.startsWith("ok."))
           throw new Error("rollback request failed");
-        result = await frame.click("a[href='https://mail.google.com/mail/u/0/#search/from:onboarding@resend.dev+subject:rollback confirmation']", "#result");
-        //todo we need to check that the events in the jsonBlob are the same as the events now stored in the system.
+        // open window and wait for it to close //openExternal
+        await new Promise(r => setTimeout(r, 2500));
+        const otherWindow = window.open("https://mail.google.com/mail/u/0/#search/from:onboarding@resend.dev+subject:confirmation");
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, i + 1000));
+          if (otherWindow.closed)
+            break;
+        }
+        //wait for the window above to be closed;
+        result = await frame.click('button[href="/api/events"]', "#result");
+        const data = result.textContent;
+        const shouldBe = await jsonBlob.text();
+        if (JSON.parse(JSON.stringify(shouldBe)) !== JSON.parse(JSON.stringify(data)))
+          throw new Error("data on server is not the same as the data in the rollback file.");
         return "olleh dlrow";
       }
     </script>
     <script expected>"olleh dlrow"</script>
   </test-e2e>
   <test-e2e name="addExistingImage" page="/">
-    <script type="module" test>
-      export default async function (frame) {
+    <script test>
+
+      window.testAddExistingImage = async function (frame) {
 
         async function getExistingImageFile(url) {
           const blob = await (await fetch(url)).blob();
@@ -87,7 +100,7 @@
   </test-e2e>
   <test-e2e name="addNewImage" page="/">
     <script type="module" test>
-      export default async function (frame) {
+      window.testAddNewImage = async function (frame) {
 
         async function generateSimpleSVG(color = Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0')) {
           const svg = `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><circle cx="100" cy="100" r="50" fill="#${color}" /></svg>`;
@@ -115,7 +128,7 @@
         return new File([blob], "tempFile.png", { type: blob.type || "image/png" });
       }
 
-      export default async function (frame) {
+      window.testAddImage = async function (frame) {
         let result = await frame.click("a[href='/auth/checkLogin']", "#result");
         if (!result.textContent.startsWith("ok."))
           throw new Error("login failed");
@@ -133,7 +146,8 @@
     </script>
     <script expected>"hallo e-mage"</script>
   </test-e2e>
-  <script type="module" src="https://cdn.jsdelivr.net/gh/orstavik/TestHTML@2.1.1/TestE2E.js"></script>
+  <script type="module" src="TestE2E.js"></script>
+  <!-- <script type="module" src="https://cdn.jsdelivr.net/gh/orstavik/TestHTML@2.1.1/TestE2E.js"></script> -->
 </body>
 <!-- 
   Empty posts TEST:

@@ -86,10 +86,15 @@ export class EventsSnaps extends DurableObject {
   // 	this.sql.exec(`DELETE FROM events`);
   // }
 
+  static validateEvents(events) {
+    if (!events) throw "empty events";
+    for (let e of events)
+      if (e.id == null || e.timestamp == null || e.email == null || e.json == null)
+        throw "invalid event: " + JSON.stringify(e);
+  }
+
   async requestRollback(newEvents, host, settings) {
-    if (!newEvents ||
-      !newEvents.every(({ id, timestamp, email, json }) => id && timestamp && email && json))
-      throw "invalid newEvents in rollback request";
+    EventsSnaps.validateEvents(newEvents);
     const { domain, backup: { emails } } = settings;
     const lastId = this.getLastEventId();
     const data = {
