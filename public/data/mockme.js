@@ -17,8 +17,8 @@ for (let id in snapJSON) {
     const timestamp1 = 327054752000 + i * 24 * 3600000;
     const timestamp2 = 327054752000 + (i + 180) * 24 * 3600000;
     eventList.push(
-        { id: i++, timestamp: timestamp1, json: snap1 },
-        { id: i++, timestamp: timestamp2, json: snap2 }
+        { id: i++, timestamp: timestamp1, json: snap1, email: "tegn.tv@gmail.com" },
+        { id: i++, timestamp: timestamp2, json: snap2, email: "tegn.tv@gmail.com" }
     );
 }
 
