@@ -11,9 +11,7 @@ export class EventsSnaps extends DurableObject {
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        uid TEXT,
-        created TEXT,
-        updated TEXT,
+        timestamp INTEGER DEFAULT (strftime('%s','now')),
         email TEXT,
         json TEXT
       );
@@ -67,12 +65,8 @@ export class EventsSnaps extends DurableObject {
     const newLastEventId = this.getLastEventId();
     if (prevSnap?.eventId === newLastEventId)
       return;
-    const events = this.getEvents(prevSnap?.eventId ?? -1)
-      .map(event => Object.fromEntries(Object.entries(event)
-        //for removing null columns (created/updated), because they could be added in the snap.
-        .filter(([k, v]) => ["uid", "created", "updated","json"].includes(k) && v != null)
-      ));
-    const eventData = events.map(({json, ...keys}) => Object.assign(json, keys));
+    const events = this.getEvents(prevSnap?.eventId ?? -1);
+    const eventData = events.map(({ json }) => json);
     const nextSnap = prevSnap?.value || {};
     //this is the object assign of the array of events into a flat object of posts.
     for (const data of eventData)
@@ -142,17 +136,13 @@ export class EventsSnaps extends DurableObject {
   }
 
   rebuild(events) {
-    this.sql.exec(`
-      DELETE FROM events;
-      DELETE FROM sqlite_sequence WHERE name='events';  
-      DELETE FROM snaps;
-    `);
-    for (const { uid, created, updated, email, json } of events) {
+    this.sql.exec(`DELETE FROM snaps`);
+    this.sql.exec(`DELETE FROM events`);
+    for (const { id, timestamp, email, json } of events)
       this.sql.exec(
-        `INSERT INTO events (uid, created, updated, email,json) VALUES (?,?,?,?,?)`,
-        uid, created, updated, email, JSON.stringify(json)
+        `INSERT INTO events (id,timestamp,email,json) VALUES (?,?,?,?)`,
+        id, timestamp, email, JSON.stringify(json)
       );
-    }
     this.updateSnap();
   }
 }
