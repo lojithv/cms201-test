@@ -61,8 +61,7 @@ const PATHS = {
 const SECURE_PATHS = {
 	"POST /api/event": async function (req, env, ctx, user) {
 		const json = await req.json();
-		await DB(env).addEvent(user, json);
-		return await DB(env).updateSnap();
+		return await DB(env).addEvent(user, json);
 	},
 	"POST /api/requestRollback": async function (req, env, ctx, user) {
 		const newEvents = await req.json();

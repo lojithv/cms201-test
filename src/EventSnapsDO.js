@@ -48,6 +48,7 @@ export class EventsSnaps extends DurableObject {
 
   addEvent(email, json) {
     this.sql.exec(`INSERT INTO events (email, json) VALUES (?, ?)`, email, JSON.stringify(json));
+    return this.updateSnap();
   }
 
   //todo upsertSnap should JSON.stringify(value) for us
@@ -60,17 +61,23 @@ export class EventsSnaps extends DurableObject {
     `, name, value, eventId, value, eventId);
   }
 
+  static updateSnap(snap, events) {
+    for (const { timestamp, email, json } of events) {
+      const o = Object.assign(snap[json.uid] ??= { email: [], created: timestamp }, json);
+      o.updated = timestamp;
+      if (!o.email.includes(email))
+        o.email.push(email);
+    }
+    return snap;
+  }
+
   updateSnap(name = "all") {
-    const prevSnap = this.getSnap(name);
+    const prevSnap = this.getSnap(name) ?? { value: {}, eventId: -1 };
     const newLastEventId = this.getLastEventId();
-    if (prevSnap?.eventId === newLastEventId)
+    if (prevSnap.eventId === newLastEventId)
       return;
-    const events = this.getEvents(prevSnap?.eventId ?? -1);
-    const eventData = events.map(({ json }) => json);
-    const nextSnap = prevSnap?.value || {};
-    //this is the object assign of the array of events into a flat object of posts.
-    for (const data of eventData)
-      nextSnap[data.uid] ? Object.assign(nextSnap[data.uid], data) : (nextSnap[data.uid] = data);
+    const events = this.getEvents(prevSnap.eventId);
+    const nextSnap = EventsSnaps.updateSnap(prevSnap.value, events);
     this.upsertSnap(name, nextSnap, newLastEventId);
     return nextSnap;
   }
