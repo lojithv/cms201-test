@@ -11,7 +11,7 @@
   function nextSiblingClass(v) {
     const el = this.ownerElement.nextElementSibling;
     prev && el.classList.remove(prev);
-    el.setAttribute("class", el.getAttribute("class") + " " + v);
+    el.setAttribute("class", el.getAttribute("class") + " " + (prev = v));
   }
   document.Reactions.define("nextclass", nextSiblingClass);
 </script>
