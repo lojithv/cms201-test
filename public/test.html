@@ -26,7 +26,7 @@
         if (!result.textContent.startsWith("ok."))
           throw new Error("login failed");
         const document = frame.document();
-        const list = JSON.parse(document.querySelector("#list").textContent);
+        const list = JSON.parse(document.querySelector("#list").textContent || '{"value": []}');
         const initialPostsLength = Object.values(list.value).length;
         document.querySelector("input[name='title']").value = "TEST";
         document.querySelector("textarea[name='content']").value = "TEST";
@@ -65,7 +65,7 @@
         result = await frame.click('button[href="/api/events"]', "#result");
         const data = result.textContent;
         const shouldBe = await jsonBlob.text();
-        if (JSON.parse(JSON.stringify(shouldBe)) !== JSON.parse(JSON.stringify(data)))
+        if (JSON.stringify(JSON.parse(shouldBe)) !== JSON.stringify(JSON.parse(data)))
           throw new Error("data on server is not the same as the data in the rollback file.");
         return "olleh dlrow";
       }
