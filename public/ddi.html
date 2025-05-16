@@ -24,7 +24,7 @@
   <ol template: id="posts" _::fetch_json:oi.value:embrace="/api/snap" class="bob">
     <!--<template for="post of $"> -->
     <li type="{{post.type}}" search="{{post.title}}{{post.name}}">
-      <a href="?post={{$post}}">
+      <a href="/edit?post={{$post}}">
         <span>{{post.type}}: {{post.title}}{{post.name}}</span>
       </a>
     </li>
