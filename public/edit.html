@@ -1,0 +1,69 @@
+<head>
+  <style csss="$color(red)"></style>
+  <script src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/dd.js"></script>
+  <script type="module"
+    src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~"
+    _:define></script>
+  <script type="module">
+    import { ErAnalysis } from "https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~";
+    document.Reactions.define("er", i => new ErAnalysis(i));
+  </script>
+  <script>
+      let postData;
+      document.Reactions.define("get-post", ({snaps, id}) => {
+        const post = snaps.posts[id];
+        if (!post)
+          return document.Reactions.break;
+        const { email, ...keys } = snaps.schema[post.type];
+        // remove time in datetime.
+        post.created = new Date(post.created).toISOString().slice(0,10);
+        post.updated = new Date(post.updated).toISOString().slice(0,10);
+        keys.created = "date";
+        keys.updated = "date";
+        postData = post;
+        return { post, keys };
+      });
+      document.Reactions.define("get-id", url => (url.searchParams.get("post")));
+      document.Reactions.define("edit-post", async function(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        if (Object.keys(data).every(k => data[k] == postData[k]))
+          return;
+        const response = await fetch("/api/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+        
+        alert(response.ok ? "Edited": "Failed Editing...");
+      });
+  </script>
+</head>
+<body _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
+  <div template: state_snaps_id:get-post:embrace>
+    <form submit:edit-post>
+          <!-- <template for="key of keys"> -->
+            <div>
+              <!-- <template if="key === 'text'"> -->
+              <label for="{{$key}}">{{$key}}</label>
+              <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+              <!-- </template> -->
+              <!-- <template if="key === 'url'"> -->
+              <label for="{{$key}}">{{$key}}</label>
+              <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+              <!-- </template> -->
+              <!-- <template if="key === 'date'"> -->
+              <label for="{{$key}}">{{$key}}</label>
+              <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+              <!-- </template> -->
+              <!-- <template if="key === 'textmd'"> -->
+              <label for="{{$key}}">{{$key}}</label>
+              <textarea type="{{key}}" name="{{$key}}" value="{{post[$key]}}">{{post[$key]}}</textarea>
+              <!-- </template> -->
+            </div>
+          <!-- </template> -->
+        <input type="submit" value="Save Edit">
+    </form>
+  </div>
+</body>
