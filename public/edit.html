@@ -2,10 +2,10 @@
   <style csss="$color(red)"></style>
   <script src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/dd.js"></script>
   <script type="module"
-    src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~"
+    src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~&Click"
     _:define></script>
   <script type="module">
-    import { ErAnalysis } from "https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~";
+    import { ErAnalysis } from "https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~&Click";
     document.Reactions.define("er", i => new ErAnalysis(i));
   </script>
   <script>
@@ -38,6 +38,21 @@
         
         alert(response.ok ? "Edited": "Failed Editing...");
       });
+      document.Reactions.define("select-img", function(e) {
+        e.preventDefault();
+        const href = this.ownerElement.getAttribute("href");
+        window.open(href, "_blank");
+      });
+  </script>
+  <script>
+    window.addEventListener("message", function(e) {
+      if (location.origin !== e.origin) 
+        return;
+      const {imageURL, key} = e.data;
+      const input = document.querySelector(`input[name="${key}"]`);
+      input.value = imageURL;
+      input.nextElementSibling.src = imageURL;
+    })
   </script>
 </head>
 <body _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
@@ -50,8 +65,24 @@
               <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
               <!-- </template> -->
               <!-- <template if="key === 'url'"> -->
-              <label for="{{$key}}">{{$key}}</label>
-              <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+                <!-- <template if="$key === 'thumbnail'"> -->
+                  <label for="{{$key}}">{{$key}}</label>
+                  <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+                  <img src="{{post[$key]}}" width="300" height="300" />
+                  <a href="/imageSelector?key={{$key}}" click:select-img>Select Image</a>
+                <!-- </template> -->
+                <!-- <template if="$key === 'logo'"> -->
+                  <label for="{{$key}}">{{$key}}</label>
+                  <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+                  <img src="{{post[$key]}}" width="300" height="300" />
+                  <a href="/imageSelector?key={{$key}}" click:select-img>Select Image</a>
+                <!-- </template> -->
+                <!-- <template if="$key === 'img'"> -->
+                  <label for="{{$key}}">{{$key}}</label>
+                  <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+                  <img src="{{post[$key]}}" width="300" height="300" />
+                  <a href="/imageSelector?key={{$key}}" click:select-img>Select Image</a>
+                <!-- </template> -->
               <!-- </template> -->
               <!-- <template if="key === 'date'"> -->
               <label for="{{$key}}">{{$key}}</label>

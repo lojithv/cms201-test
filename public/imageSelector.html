@@ -1,0 +1,35 @@
+<style>
+    img { width: 5rem; height: 5rem; border: 2px solid gray }
+    img.focused { width: 15rem; height: 15rem }
+</style>
+<script src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/dd.js"></script>
+<script type="module"
+  src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&embrace&Csss&Class&Click&Dblclick"
+  _:define></script>
+<script>
+    document.Reactions.define("shrink-all", function(e) {
+        e.stopPropagation();
+        const focused = document.querySelector("img.focused");
+        focused && focused.classList.remove("focused");
+    });
+    document.Reactions.define("grow", function() { this.ownerElement.classList.add("focused") });    
+    document.Reactions.define("selected", function(key) {
+        if (!window.opener) 
+            return document.Reactions.break;
+        const src = this.ownerElement.getAttribute("src");
+        window.opener.postMessage({ imageURL: src, key }, location.origin);
+        window.close();
+    });
+    document.Reactions.define("get-key", () => new URL(location.href).searchParams.get("key"));
+</script>
+</script>
+<body click:shrink-all nav:get-key:state_key>    
+    <section template: _::fetch_json:embrace="/api/uploaded-images">
+        <!-- <template for="src of $"> -->
+            <img src="{{src}}"
+                click:shrink-all:grow
+                dblclick:get-key:selected
+            />
+        <!-- </template> -->
+    </section>
+</body>
