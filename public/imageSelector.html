@@ -17,7 +17,7 @@
         if (!window.opener) 
             return document.Reactions.break;
         const src = this.ownerElement.getAttribute("src");
-        window.opener.postMessage({ imageURL: src, key }, location.origin);
+        window.opener.postMessage({ type: "image", data: { key, imageURL: src } }, location.origin);
         window.close();
     });
     document.Reactions.define("get-key", () => new URL(location.href).searchParams.get("key"));
