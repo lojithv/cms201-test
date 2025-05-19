@@ -8,6 +8,9 @@
         user-select: none;
         cursor: pointer;
     }
+    .droppable {
+        height: 100%;
+    }
 </style>
 <script src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/dd.js"></script>
   <script type="module"
@@ -22,12 +25,7 @@
             return document.Reactions.break;
         return post;
     });
-    document.Reactions.define("get-post-relation", ({post, key}) => {
-        const references = post[key];
-        if (!references)
-            return document.Reactions.break;
-        return references;
-    });
+    document.Reactions.define("get-post-relation", ({post, key}) => post[key] ?? []);
     document.Reactions.define("get-post-type-key", ({snaps, key}) => (
         Object.keys(snaps)
             //check for key/key(s)
