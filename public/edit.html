@@ -2,13 +2,13 @@
   <style csss="$color(red)"></style>
   <script src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/dd.js"></script>
   <script type="module"
-    src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~"
+    src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~&Click"
     _:define></script>
   <script type="module">
-    import { ErAnalysis } from "https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~";
+    import { ErAnalysis } from "https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~&Click";
     document.Reactions.define("er", i => new ErAnalysis(i));
   </script>
-  <script>
+  <script>  
       let postData;
       document.Reactions.define("get-post", ({snaps, id}) => {
         const post = snaps.posts[id];
@@ -20,6 +20,12 @@
         post.updated = new Date(post.updated).toISOString().slice(0,10);
         keys.created = "date";
         keys.updated = "date";
+        for (let key of Object.keys(snaps.schema)) {
+          if (keys.hasOwnProperty(key))
+            keys[key] = "relation";
+          if (keys.hasOwnProperty(`${key}s`))
+            keys[`${key}s`] = "relation";
+        }
         postData = post;
         return { post, keys };
       });
@@ -27,21 +33,60 @@
       document.Reactions.define("edit-post", async function(e) {
         e.preventDefault();
         const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        if (Object.keys(data).every(k => data[k] == postData[k]))
-          return;
+        const data = {};
+        const types = this.ownerElement.parentElement.getAttribute("types").split(",");
+        for (let [key, value] of formData.entries()) {
+          if (value && value != postData[key]) 
+          data[key] = value;
+        }
+        for (let type of types) {
+          const key = `${type}s`; 
+          if (data.hasOwnProperty(key)) {
+            if (!data[key] && postData.hasOwnProperty(key)) 
+              data[key] = JSON.stringify(postData[key]);
+            data[key] = JSON.parse(data[key]);
+          } 
+        }
         const response = await fetch("/api/event", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
+          body: JSON.stringify({...data, uid: formData.get("uid")})
         });
         
         alert(response.ok ? "Edited": "Failed Editing...");
       });
+      document.Reactions.define("select-in-other-tab", function(e) {
+        e.preventDefault();
+        const href = this.ownerElement.getAttribute("href");
+        window.open(href, "_blank");
+      });
+      document.Reactions.define("store-types", function({snaps}) {
+        this.ownerElement.setAttribute("types", Object.keys(snaps.schema));
+      });
+  </script>
+  <script>
+    window.addEventListener("message", function(e) {
+      if (location.origin !== e.origin) 
+        return;
+      const {data, type} = e.data;
+      if (type === "image") {
+        const {imageURL, key} = data;
+        const input = document.querySelector(`input[name="${key}"]`);
+        input.value = imageURL;
+        input.nextElementSibling.src = imageURL;
+      }
+      if (type === "references") {
+        const {references, key} = data;
+        const input = document.querySelector(`input[name="${key}"]`);
+        input.value = JSON.stringify(references);
+        const container = document.querySelector(`#${key}`);
+        container.innerHTML = references.map(reference => `<li>${reference}</li>`).join("\n");
+      }
+    })
   </script>
 </head>
 <body _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
-  <div template: state_snaps_id:get-post:embrace>
+  <div template: state_snaps_id:get-post:embrace state_snaps:store-types>
     <form submit:edit-post>
           <!-- <template for="key of keys"> -->
             <div>
@@ -50,8 +95,24 @@
               <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
               <!-- </template> -->
               <!-- <template if="key === 'url'"> -->
-              <label for="{{$key}}">{{$key}}</label>
-              <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+                <!-- <template if="$key === 'thumbnail'"> -->
+                  <label for="{{$key}}">{{$key}}</label>
+                  <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+                  <img src="{{post[$key]}}" width="300" height="300" />
+                  <a href="/imageSelector?key={{$key}}" click:select-in-other-tab>Select Image</a>
+                <!-- </template> -->
+                <!-- <template if="$key === 'logo'"> -->
+                  <label for="{{$key}}">{{$key}}</label>
+                  <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+                  <img src="{{post[$key]}}" width="300" height="300" />
+                  <a href="/imageSelector?key={{$key}}" click:select-in-other-tab>Select Image</a>
+                <!-- </template> -->
+                <!-- <template if="$key === 'img'"> -->
+                  <label for="{{$key}}">{{$key}}</label>
+                  <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
+                  <img src="{{post[$key]}}" width="300" height="300" />
+                  <a href="/imageSelector?key={{$key}}" click:select-in-other-tab>Select Image</a>
+                <!-- </template> -->
               <!-- </template> -->
               <!-- <template if="key === 'date'"> -->
               <label for="{{$key}}">{{$key}}</label>
@@ -60,6 +121,16 @@
               <!-- <template if="key === 'textmd'"> -->
               <label for="{{$key}}">{{$key}}</label>
               <textarea type="{{key}}" name="{{$key}}" value="{{post[$key]}}">{{post[$key]}}</textarea>
+              <!-- </template> -->
+              <!-- <template if="key === 'relation'"> -->
+              <label for="{{$key}}">{{$key}}:</label>
+              <input type="hidden" name="{{$key}}" references/>
+              <ul id="{{$key}}">
+                <!-- <template for="value of post[$key]"> -->
+                  <li>{{value}}</li>
+                  <!-- template> -->
+                </ul>
+              <a href="/listSelector?post={{post.uid}}&key={{$key}}" click:select-in-other-tab>select reference</a>
               <!-- </template> -->
             </div>
           <!-- </template> -->

@@ -1,7 +1,7 @@
 <style csss></style>
 <script src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/dd.js"></script>
 <script type="module"
-  src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&el.~&at.~&embrace&Input&Csss&Class"
+  src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&el.~&at.~&embrace&Input&Csss&Class&Mouseenter&Mouseleave"
   _:define></script>
 <script>
   const stringTemplate = (pattern, ...args) => args.reduce((p, v, i) => p.replaceAll(`\${${i}}`, v), pattern);
@@ -14,8 +14,17 @@
     el.setAttribute("class", el.getAttribute("class") + " " + (prev = v));
   }
   document.Reactions.define("nextclass", nextSiblingClass);
+  document.Reactions.define("get-display-position", function(e) {
+    const pad = 30;
+    const left = e.clientX + pad + "px";
+    const top = document.body.scrollTop + e.clientY + "px";
+    return {left, top};
+  });
+  document.Reactions.define("show-post-detail", function(postId, { left, top }) {
+    document.body.insertAdjacentHTML("beforeend", `<iframe style="position: absolute; left: ${left}; top: ${top};" width="300" height="300" src="/showPost?post=${postId}"></iframe>`);
+  });
+  document.Reactions.define("hide-post-detail", () => document.body.removeChild(document.body.lastChild));
 </script>
-
 <details open>
   <summary>Posts</summary>
   <input type="text" id="search" name="search" placeholder="Search..."
@@ -24,8 +33,11 @@
   <ol template: id="posts" _::fetch_json:oi.value:embrace="/api/snap" class="bob">
     <!--<template for="post of $"> -->
     <li type="{{post.type}}" search="{{post.title}}{{post.name}}">
-      <a href="/edit?post={{$post}}">
-        <span>{{post.type}}: {{post.title}}{{post.name}}</span>
+      <a href="/edit?post={{$post}}"
+          mouseenter:get-display-position:at.value:show-post-detail="{{post.uid}}"
+          mouseleave:hide-post-detail
+      >
+        <span >{{post.type}}: {{post.title}}{{post.name}}</span>
       </a>
     </li>
     <!--</template> -->

@@ -12,6 +12,27 @@ const PATHS = {
 		const name = req.url.searchParams.get("name");
 		return await DB(env).getSnap(name);
 	},
+	"GET /api/uploaded-images": async function(req, env, ctx) {
+		const { image_server: { account_id, api_token } } = env.settings;
+		// required paginating to retrieve all images in cloudfare images (100 imgs/page default)
+		let page = 1;
+		let imgURLs = [];
+		while (true) {
+			const url = `https://api.cloudflare.com/client/v4/accounts/${account_id}/images/v1?page=${page}`;
+			const response = await fetch(url, {headers: { "Authorization": `Bearer ${api_token}` }});
+			if (!response.ok)
+				break;
+			const { images } = (await response.json()).result;
+			if (!images || (images && !images.length))
+				break;
+			const urls = images.filter(img => !img.requiredSignedURLs).map(img => img.variants[0]);
+			imgURLs = [...imgURLs, ...urls];
+			if (images.length < 100)
+				break;
+			page++;
+		}
+		return imgURLs;
+	},
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
 		const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
