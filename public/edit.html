@@ -1,5 +1,5 @@
 <head>
-  <style csss="$color(red)"></style>
+  <style csss=""></style>
   <script src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/dd.js"></script>
   <script type="module"
     src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~&Click"
@@ -85,11 +85,12 @@
     })
   </script>
 </head>
-<body _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
-  <div template: state_snaps_id:get-post:embrace state_snaps:store-types>
-    <form submit:edit-post>
+<body class="$palette(#4f46e5) $flex(cc) $bg(#f9fafb)" _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
+  <div style="box-shadow:0 4px 6px rgba(0, 0, 0, 0.1)" class="$w(min,100%,700px) $h(min) $bg(white) $padding(2rem) $font(helvetica,arial,'sans-serif',500,capitalize)" template: state_snaps_id:get-post:embrace state_snaps:store-types>
+    <h1 class="$block(c) $color(--primary,--primary)">Edit Post</h1>
+    <form submit:edit-post class="$flex(column,gap(1rem))">
           <!-- <template for="key of keys"> -->
-            <div>
+            <div class="|label$fontWeight(bold) |textarea$w(,100%,)$margin(.5rem,0,0,0)$padding(.7rem)$borderColor(#d1d5db)$border(solid,1px,radius(6px)) |input$w(,100%,)$padding(.7rem)$margin(.5rem,0,0,0)$borderColor(#d1d5db)$border(solid,1px,radius(6px))">
               <!-- <template if="key === 'text'"> -->
               <label for="{{$key}}">{{$key}}</label>
               <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
@@ -120,7 +121,7 @@
               <!-- </template> -->
               <!-- <template if="key === 'textmd'"> -->
               <label for="{{$key}}">{{$key}}</label>
-              <textarea type="{{key}}" name="{{$key}}" value="{{post[$key]}}">{{post[$key]}}</textarea>
+              <textarea type="{{key}}" name="{{$key}}" value="{{post[$key]}}" rows="10">{{post[$key]}}</textarea>
               <!-- </template> -->
               <!-- <template if="key === 'relation'"> -->
               <label for="{{$key}}">{{$key}}:</label>
@@ -130,11 +131,11 @@
                   <li>{{value}}</li>
                   <!-- template> -->
                 </ul>
-              <a href="/listSelector?post={{post.uid}}&key={{$key}}" click:select-in-other-tab>select reference</a>
+              <a href="/listSelector?post={{post.uid}}&key={{$key}}" click:select-in-other-tab class="$em(0.9rem)">select reference</a>
               <!-- </template> -->
             </div>
           <!-- </template> -->
-        <input type="submit" value="Save Edit">
+        <input type="submit" value="Save Edit" class="$padding(.8rem) $cursor(pointer) $bg(--primary) $color(white,white) $em(.9rem) $border(solid,1px,radius(6px))">
     </form>
   </div>
 </body>
