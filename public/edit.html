@@ -85,8 +85,14 @@
     })
   </script>
 </head>
-<body class="$palette(#4f46e5) $flex(cc) $bg(#f9fafb)" _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
-  <div style="box-shadow:0 4px 6px rgba(0, 0, 0, 0.1)" class="$w(min,100%,700px) $h(min) $bg(white) $padding(2rem) $font(helvetica,arial,'sans-serif',500,capitalize)" template: state_snaps_id:get-post:embrace state_snaps:store-types>
+<body class="$palette(#4f46e5) $flex(cc) $bg(#f9fafb)" 
+  _::fetch_json:oi.value:er:state_snaps="/api/snap"
+  nav:get-id:state_id
+>
+  <div template: style="box-shadow:0 4px 6px rgba(0, 0, 0, 0.1)" class="$w(min,100%,700px) $h(min) $bg(white) $padding(2rem) $font(helvetica,arial,'sans-serif',500,capitalize)" 
+    state_snaps_id:get-post:embrace
+    state_snaps:store-types
+  >
     <h1 class="$block(c) $color(--primary,--primary)">Edit Post</h1>
     <form submit:edit-post class="$flex(column,gap(1rem))">
           <!-- <template for="key of keys"> -->

@@ -27,7 +27,9 @@
 </script>
 <body class="$bg(white)">
     <section _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
-        <div template: state_snaps_id:get-post:show-post:embrace class="$font(helvetica,arial,'sans-serif',500)">
+        <div template: class="$font(helvetica,arial,'sans-serif',500)"
+            state_snaps_id:get-post:show-post:embrace
+        >
             <!-- <template for="key of keys"> -->
                 <div>
                     <span class="$color(gray,gray) $fontWeight(bold)">{{$key}}</span>: {{post[$key]}}

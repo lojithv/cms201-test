@@ -33,8 +33,13 @@
     });
 </script>
 </head>
-<body class="$bg(#f9fafb) $font(helvetica,arial,'sans-serif',500,capitalize) $flex(cc)" _::fetch_json:oi.value:state_snaps="/api/snap" nav:get-id:state_id>
-    <div class="$flex(gap(2rem)) $h(min-content) |section$bg(white)" nav:get-key:state_key state_snaps_id:get-post:state_post state_post_key:get-post-relation:state_relation>
+<body class="$bg(#f9fafb) $font(helvetica,arial,'sans-serif',500,capitalize) $flex(cc)"
+    _::fetch_json:oi.value:state_snaps="/api/snap"
+    nav:get-id:state_id>
+    <div class="$flex(gap(2rem)) $h(min-content) |section$bg(white)" 
+        nav:get-key:state_key state_snaps_id:get-post:state_post
+        state_post_key:get-post-relation:state_relation
+    >
         <section template: state_relation:embrace>
             <h5 class="$bg(#dcfce7) $padding(1rem)">SELECTED</h5>
             <ul class="droppable $h(,100%,) $flex(column,gap(.5rem)) $padding(0,1rem) |li$border(solid,1px,radius(5px))$borderColor(#e5e7eb)$cursor(pointer)$padding(1rem)">
@@ -43,7 +48,10 @@
                 <!-- </template> -->
             </ul>
         </section>
-        <section template: state_snaps_key:get-post-type-key:state_postKeyType state_postKeyType_relation:diff:embrace>
+        <section template: 
+            state_snaps_key:get-post-type-key:state_postKeyType
+            state_postKeyType_relation:diff:embrace
+        >
             <h5 class="$bg(#fef3c7) $padding(1rem)">NOT SELECTED</h5>
              <ul class="droppable $h(,100%,) $flex(column,gap(.5rem)) $padding(0,1rem) |li$border(solid,1px,radius(5px))$borderColor(#e5e7eb)$cursor(pointer)$padding(1rem)">
                 <!-- <template for="item of $"> -->
