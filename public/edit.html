@@ -96,7 +96,7 @@
     <h1 class="$block(c) $color(--primary,--primary)">Edit Post</h1>
     <form submit:edit-post class="$flex(column,gap(1rem))">
           <!-- <template for="key of keys"> -->
-            <div class="|label$fontWeight(bold) |textarea$w(,100%,)$margin(.5rem,0,0,0)$padding(.7rem)$borderColor(#d1d5db)$border(solid,1px,radius(6px)) |input$w(,100%,)$padding(.7rem)$margin(.5rem,0,0,0)$borderColor(#d1d5db)$border(solid,1px,radius(6px))">
+            <div class="|label$fontWeight(bold) |input,textarea$w(,100%,)$padding(.7rem)$margin(.5rem,0,0,0)$borderColor(#d1d5db)$border(solid,1px,radius(6px))">
               <!-- <template if="key === 'text'"> -->
               <label for="{{$key}}">{{$key}}</label>
               <input type="{{key}}" name="{{$key}}" value="{{post[$key]}}" />
