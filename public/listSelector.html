@@ -1,16 +1,7 @@
 <head>
-<style>
-    div {
-        display: flex;
-        gap: 10rem;
-    }
-    li {
-        user-select: none;
-        cursor: pointer;
-    }
-    .droppable {
-        height: 100%;
-    }
+<style csss="">
+    h5 { margin: 0; }
+    .draggable { list-style: none; user-select: none; }
 </style>
 <script src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/dd.js"></script>
   <script type="module"
@@ -19,17 +10,12 @@
 <script>
     document.Reactions.define("get-id", url => (url.searchParams.get("post")));
     document.Reactions.define("get-key", _ => (new URL(location.href).searchParams.get("key")));
-    document.Reactions.define("get-post", ({snaps, id}) => {
-        const post = snaps[id];
-        if (!post)
-            return document.Reactions.break;
-        return post;
-    });
+    document.Reactions.define("get-post", ({snaps, id}) => snaps[id] ? snaps[id] : document.Reactions.break);
     document.Reactions.define("get-post-relation", ({post, key}) => post[key] ?? []);
     document.Reactions.define("get-post-type-key", ({snaps, key}) => (
         Object.keys(snaps)
             //check for key/key(s)
-            .filter(k => k.split("/").includes(key) || k.split("/").includes(key.slice(0, -1)))
+            .filter(k => [key, key.slice(0, -1)].includes(k.split("/")[0]))
     ));
     document.Reactions.define("diff", ({ relation, postkeytype }) => {
         return postkeytype.filter(key => !relation.includes(key));
@@ -40,35 +26,42 @@
         const droppable = document.querySelector(".droppable");
         const draggables = droppable.querySelectorAll(".draggable");
         let references = [];
-        for (let draggable of draggables) {
+        for (let draggable of draggables)
             references.push(draggable.textContent);
-        }
         window.opener.postMessage({ type: "references", data: { key, references } }, location.origin);
         window.close();
     });
 </script>
 </head>
-<body _::fetch_json:oi.value:state_snaps="/api/snap" nav:get-id:state_id>
-    <div nav:get-key:state_key state_snaps_id:get-post:state_post state_post_key:get-post-relation:state_relation>
+<body class="$bg(#f9fafb) $font(helvetica,arial,'sans-serif',500,capitalize) $flex(cc)"
+    _::fetch_json:oi.value:state_snaps="/api/snap"
+    nav:get-id:state_id>
+    <div class="$flex(gap(2rem)) $h(min-content) |section$bg(white)" 
+        nav:get-key:state_key state_snaps_id:get-post:state_post
+        state_post_key:get-post-relation:state_relation
+    >
         <section template: state_relation:embrace>
-            <h5>SELECTED:</h5>
-            <ul class="droppable">
+            <h5 class="$bg(#dcfce7) $padding(1rem)">SELECTED</h5>
+            <ul class="droppable $h(,100%,) $flex(column,gap(.5rem)) $padding(0,1rem) |li$border(solid,1px,radius(5px))$borderColor(#e5e7eb)$cursor(pointer)$padding(1rem)">
                 <!-- <template for="item of relation"> -->
                     <li draggable="true" class="draggable">{{item}}</li>
                 <!-- </template> -->
             </ul>
         </section>
-        <section template: state_snaps_key:get-post-type-key:state_postKeyType state_postKeyType_relation:diff:embrace>
-            <h5>NOT SELECTED:</h5>
-             <ul class="droppable">
+        <section template: 
+            state_snaps_key:get-post-type-key:state_postKeyType
+            state_postKeyType_relation:diff:embrace
+        >
+            <h5 class="$bg(#fef3c7) $padding(1rem)">NOT SELECTED</h5>
+             <ul class="droppable $h(,100%,) $flex(column,gap(.5rem)) $padding(0,1rem) |li$border(solid,1px,radius(5px))$borderColor(#e5e7eb)$cursor(pointer)$padding(1rem)">
                 <!-- <template for="item of $"> -->
                     <li draggable="true" class="draggable">{{item}}</li>
                 <!-- </template> -->
             </ul>
         </section>
-        <section>
-            <button click:get-key:save-references>Save</button>
-        </section>
+        <div>
+            <button class="$padding(.8rem) $cursor(pointer) $bg(#4f46e5) $color(white,white) $em(.9rem) $border(solid,1px,radius(6px))" click:get-key:save-references>Save</button>
+        </div>
     </div>
 <script>
     (async() => {

@@ -1,6 +1,4 @@
-<style>
-    body {background-color: white;}
-</style>
+<style csss=""></style>
 <script src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/dd.js"></script>
 <script type="module"
   src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Csss&Class&NAV&STATE~~"
@@ -27,13 +25,16 @@
     });
     document.Reactions.define("get-id", url => (url.searchParams.get("post")));
 </script>
-
-<section _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
-  <div template: state_snaps_id:get-post:show-post:embrace>
-        <!-- <template for="key of keys"> -->
-        <div>
-            {{$key}}: {{post[$key]}}
+<body class="$bg(white)">
+    <section _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
+        <div template: class="$font(helvetica,arial,'sans-serif',500)"
+            state_snaps_id:get-post:show-post:embrace
+        >
+            <!-- <template for="key of keys"> -->
+                <div>
+                    <span class="$color(gray,gray) $fontWeight(bold)">{{$key}}</span>: {{post[$key]}}
+                </div>
+            <!-- </template> -->
         </div>
-        <!-- </template> -->
-  </div>
-</section>
+    </section>
+</body>
