@@ -187,7 +187,7 @@ async function onFetch(request, env, ctx) {
 			res = await res;
 		return res instanceof Response ? res :
 			(typeof res === "string") ? new Response(res) :
-				new Response(JSON.stringify(res), { headers: { "Content-Type": "application/json", } });
+				new Response(JSON.stringify(res), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", } });
 	} catch (error) {
 		console.log(error, request.url);
 		// we can store the errors in the durable object?
