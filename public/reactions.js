@@ -1,26 +1,25 @@
-import { ErAnalysis } from "https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Csss&Class&NAV&STATE~~";
+import { ErAnalysis } from "https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js";
 
 const stringTemplate = (pattern, ...args) => args.reduce((p, v, i) => p.replaceAll(`\${${i}}`, v), pattern);
-document.Reactions.define("string-template", stringTemplate);
-document.Reactions.define("er", i => new ErAnalysis(i));
-document.Reactions.define("get-id", url => (url.searchParams.get("post")));
-document.Reactions.define("get-key", _ => (new URL(location.href).searchParams.get("key")));
-document.Reactions.define("get-post", ({snaps, id}) => snaps?.[id] ? snaps[id] : document.Reactions.break);
-document.Reactions.define("get-post-with-relation", ({snaps, id}) => snaps?.posts?.[id] ? snaps.posts[id] : document.Reactions.break);
-document.Reactions.define("add-post-key", ({ snaps, post }) => {
+const er = i => new ErAnalysis(i);
+const getId = url => (url.searchParams.get("post"));
+const getKey = _ => (new URL(location.href).searchParams.get("key"));
+const getPost = ({snaps, id}) => snaps?.[id] ? snaps[id] : document.Reactions.break;
+const getPostWithRelation = ({snaps, id}) => snaps?.posts?.[id] ? snaps.posts[id] : document.Reactions.break;
+const addPostKey = ({ snaps, post }) => {
     const { email, ...keys } = snaps.schema[post.type];
     return { post, keys };
-});
-document.Reactions.define("get-post-relation", ({post, key}) => post[key] ?? []);
-document.Reactions.define("get-post-type-key", ({snaps, key}) => (
+};
+const getPostRelation = ({post, key}) => post[key] ?? [];
+const getPostTypeKey = ({snaps, key}) => (
     Object.keys(snaps)
         //check for key/key(s)
         .filter(k => [key, key.slice(0, -1)].includes(k.split("/")[0]))
-));
-document.Reactions.define("diff", ({ relation, postkeytype }) => {
+);
+const diff = ({ relation, postkeytype }) => {
     return postkeytype.filter(key => !relation.includes(key));
-});
-document.Reactions.define("save-references", function(key) {
+};
+const saveReferences = function(key) {
     if (!window.opener)
         return document.Reactions.break;
     const droppable = document.querySelector(".droppable");
@@ -30,8 +29,8 @@ document.Reactions.define("save-references", function(key) {
         references.push(draggable.textContent);
     window.opener.postMessage({ type: "references", data: { key, references } }, location.origin);
     window.close();
-});
-document.Reactions.define("show-post", ({post, keys}) => {
+};
+const showPost = ({post, keys}) => {
     const postDisplay = {
         ...post,
         created: new Date(post.created).toISOString().slice(0,10),
@@ -40,38 +39,37 @@ document.Reactions.define("show-post", ({post, keys}) => {
     for (let key in keys)
     if (Array.isArray(post[key])) keys[key] = "relation"; 
     return { post: postDisplay, keys: {...keys, created: "date", updated: "date"} };
-});
+};
 let prev;
-function nextSiblingClass(v) {
+function nextclass(v) {
     const el = this.ownerElement.nextElementSibling;
     prev && el.classList.remove(prev);
     el.setAttribute("class", el.getAttribute("class") + " " + (prev = v));
 }
-document.Reactions.define("nextclass", nextSiblingClass);
-document.Reactions.define("get-display-position", function(e) {
+const getDisplayPosition = (e) => {
     const pad = 30;
     const left = e.clientX + pad + "px";
     const top = document.body.scrollTop + e.clientY + "px";
     return {left, top};
-});
-document.Reactions.define("show-post-detail", function(postId, { left, top }) {
+};
+const showPostDetail = (postId, { left, top }) => {
     document.body.insertAdjacentHTML("beforeend", `<iframe style="position: absolute; left: ${left}; top: ${top};" width="300" height="300" src="/showPost?post=${postId}"></iframe>`);
-});
-document.Reactions.define("hide-post-detail", () => document.body.removeChild(document.body.lastChild));
-document.Reactions.define("shrink-all", function(e) {
+};
+const hidePostDetail = () => document.body.removeChild(document.body.lastChild);
+const shrinkAll = (e) => {
     e.stopPropagation();
     const focused = document.querySelector("img.focused");
     focused && focused.classList.remove("focused");
-});
-document.Reactions.define("grow", function() { this.ownerElement.classList.add("focused") });    
-document.Reactions.define("selected", function(key) {
+};
+function grow() { this.ownerElement.classList.add("focused") };    
+function selected(key) {
     if (!window.opener) 
         return document.Reactions.break;
     const src = this.ownerElement.getAttribute("src");
     window.opener.postMessage({ type: "image", data: { key, imageURL: src } }, location.origin);
     window.close();
-});
-document.Reactions.define("form-diff", function(newPost) {
+};
+function formDiff(newPost) {
     const diff = {};
     const oldPost = JSON.parse(this.ownerElement.getAttribute("post")); 
     for (let [k,v1] of Object.entries(newPost)) {
@@ -83,8 +81,8 @@ document.Reactions.define("form-diff", function(newPost) {
             diff[k] = v1;
     }
     return diff;
-});
-document.Reactions.define("parse-relation", function (diff) {
+};
+function parseRelation (diff) {
     if (Object.keys(diff).length === 0)
         return document.Reactions.break;
     const oldPost = JSON.parse(this.ownerElement.getAttribute("post"));
@@ -92,8 +90,8 @@ document.Reactions.define("parse-relation", function (diff) {
         if (typeof oldPost[key] === "object")
         diff[key] = JSON.parse(diff[key]);
     return diff;
-});
-document.Reactions.define("edit-post", async function(data) {
+};
+async function editPost(data) {
     if (!data) 
         return "Nothing is Updated!";
     const oldPost = JSON.parse(this.ownerElement.getAttribute("post"));
@@ -103,14 +101,42 @@ document.Reactions.define("edit-post", async function(data) {
         body: JSON.stringify({...data, uid: oldPost.uid})
     });
     return response.ok ? "Edited": "Failed Editing...";
-});
-document.Reactions.define("alert", (msg) => alert(msg));
-document.Reactions.define("select-in-other-tab", function(e) {
+};
+const alert_ = msg => alert(msg);
+function selectInOtherTab(e) {
     e.preventDefault();
     const href = this.ownerElement.getAttribute("href");
     window.open(href, "_blank");
-});
-document.Reactions.define("formdata-json", function() {
+};
+function formdataJson() {
     const formdata = new FormData(this.ownerElement);
     return Object.fromEntries(formdata.entries());
-});
+};
+
+export {
+ stringTemplate,
+ er,
+ getId,
+ getKey,
+ getPost,
+ getPostWithRelation,
+ addPostKey,
+ getPostRelation,
+ getPostTypeKey,
+ diff,
+ saveReferences,
+ showPost,
+ nextclass,
+ getDisplayPosition,
+ showPostDetail,
+ hidePostDetail,
+ shrinkAll,
+ grow,    
+ selected,
+ formDiff,
+ parseRelation,
+ editPost,
+ alert_,
+ selectInOtherTab,
+ formdataJson
+};
