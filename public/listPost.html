@@ -3,28 +3,7 @@
 <script type="module"
   src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&el.~&at.~&embrace&Input&Csss&Class&Mouseenter&Mouseleave"
   _:define></script>
-<script>
-  const stringTemplate = (pattern, ...args) => args.reduce((p, v, i) => p.replaceAll(`\${${i}}`, v), pattern);
-  document.Reactions.define("string-template", stringTemplate);
-
-  let prev;
-  function nextSiblingClass(v) {
-    const el = this.ownerElement.nextElementSibling;
-    prev && el.classList.remove(prev);
-    el.setAttribute("class", el.getAttribute("class") + " " + (prev = v));
-  }
-  document.Reactions.define("nextclass", nextSiblingClass);
-  document.Reactions.define("get-display-position", function(e) {
-    const pad = 30;
-    const left = e.clientX + pad + "px";
-    const top = document.body.scrollTop + e.clientY + "px";
-    return {left, top};
-  });
-  document.Reactions.define("show-post-detail", function(postId, { left, top }) {
-    document.body.insertAdjacentHTML("beforeend", `<iframe style="position: absolute; left: ${left}; top: ${top};" width="300" height="300" src="/showPost?post=${postId}"></iframe>`);
-  });
-  document.Reactions.define("hide-post-detail", () => document.body.removeChild(document.body.lastChild));
-</script>
+<script type="module" src="/reactions.js"></script>
 <body class="$flex(cc) $bg(#f9fafb)">
   <details open style="box-shadow:0 4px 6px rgba(0, 0, 0, 0.1)" class="$bg(white) $w(min,100%,700px) $h(min) $padding(3rem) $font(helvetica,arial,'sans-serif',500,capitalize)">
     <summary class="$em(1.3rem) $fontWeight(bold)">Posts</summary>

@@ -6,22 +6,7 @@
 <script type="module"
   src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&embrace&Csss&Class&Click&Dblclick"
   _:define></script>
-<script>
-    document.Reactions.define("shrink-all", function(e) {
-        e.stopPropagation();
-        const focused = document.querySelector("img.focused");
-        focused && focused.classList.remove("focused");
-    });
-    document.Reactions.define("grow", function() { this.ownerElement.classList.add("focused") });    
-    document.Reactions.define("selected", function(key) {
-        if (!window.opener) 
-            return document.Reactions.break;
-        const src = this.ownerElement.getAttribute("src");
-        window.opener.postMessage({ type: "image", data: { key, imageURL: src } }, location.origin);
-        window.close();
-    });
-    document.Reactions.define("get-key", () => new URL(location.href).searchParams.get("key"));
-</script>
+<script type="module" src="/reactions.js"></script>
 </script>
 <body click:shrink-all nav:get-key:state_key>    
     <section template: _::fetch_json:embrace="/api/uploaded-images">

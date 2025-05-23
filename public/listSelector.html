@@ -7,31 +7,7 @@
   <script type="module"
     src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~&Click"
     _:define></script>
-<script>
-    document.Reactions.define("get-id", url => (url.searchParams.get("post")));
-    document.Reactions.define("get-key", _ => (new URL(location.href).searchParams.get("key")));
-    document.Reactions.define("get-post", ({snaps, id}) => snaps[id] ? snaps[id] : document.Reactions.break);
-    document.Reactions.define("get-post-relation", ({post, key}) => post[key] ?? []);
-    document.Reactions.define("get-post-type-key", ({snaps, key}) => (
-        Object.keys(snaps)
-            //check for key/key(s)
-            .filter(k => [key, key.slice(0, -1)].includes(k.split("/")[0]))
-    ));
-    document.Reactions.define("diff", ({ relation, postkeytype }) => {
-        return postkeytype.filter(key => !relation.includes(key));
-    });
-    document.Reactions.define("save-references", function(key) {
-        if (!window.opener)
-            return document.Reactions.break;
-        const droppable = document.querySelector(".droppable");
-        const draggables = droppable.querySelectorAll(".draggable");
-        let references = [];
-        for (let draggable of draggables)
-            references.push(draggable.textContent);
-        window.opener.postMessage({ type: "references", data: { key, references } }, location.origin);
-        window.close();
-    });
-</script>
+<script type="module" src="/reactions.js"></script>
 </head>
 <body class="$bg(#f9fafb) $font(helvetica,arial,'sans-serif',500,capitalize) $flex(cc)"
     _::fetch_json:oi.value:state_snaps="/api/snap"

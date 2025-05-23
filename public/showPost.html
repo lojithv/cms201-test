@@ -3,32 +3,11 @@
 <script type="module"
   src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Csss&Class&NAV&STATE~~"
   _:define></script>
-<script type="module">
-    import { ErAnalysis } from "https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Csss&Class&NAV&STATE~~";
-    document.Reactions.define("er", i => new ErAnalysis(i));
-</script>
-<script> 
-    document.Reactions.define("get-post", ({snaps, id}) => {
-        const post = snaps.posts[id];
-        if (!post)
-            return document.Reactions.break;
-        const { email, ...keys } = snaps.schema[post.type];
-        return { post, keys };
-    });
-    document.Reactions.define("show-post", ({post, keys}) => {
-        const postDisplay = {
-            ...post,
-            created: new Date(post.created).toISOString(),
-            updated: new Date(post.updated).toISOString()
-        };
-        return { post: postDisplay, keys: {...keys, created: "date", updated: "date"} };
-    });
-    document.Reactions.define("get-id", url => (url.searchParams.get("post")));
-</script>
+<script type="module" src="/reactions.js"></script>
 <body class="$bg(white)">
-    <section _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id>
+    <section _::fetch_json:oi.value:er:state_snaps="/api/snap" nav:get-id:state_id state_snaps_id:get-post-with-relation:state_post>
         <div template: class="$font(helvetica,arial,'sans-serif',500)"
-            state_snaps_id:get-post:show-post:embrace
+            state_snaps_post:add-post-key:show-post:embrace
         >
             <!-- <template for="key of keys"> -->
                 <div>
