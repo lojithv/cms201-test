@@ -4,66 +4,7 @@
   <script type="module"
     src="https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~&Click"
     _:define></script>
-  <script type="module">
-    import { ErAnalysis } from "https://cdn.jsdelivr.net/gh/orstavik/doubledots@main25.05.13.13/ddx.js?fetch_json&oi.~&embrace&Submit&Csss&Class&NAV&STATE~~&Click";
-    document.Reactions.define("er", i => new ErAnalysis(i));
-  </script>
-  <script>  
-      let postData;
-      document.Reactions.define("get-post", ({snaps, id}) => {
-        const post = snaps.posts[id];
-        if (!post)
-          return document.Reactions.break;
-        const { email, ...keys } = snaps.schema[post.type];
-        // remove time in datetime.
-        post.created = new Date(post.created).toISOString().slice(0,10);
-        post.updated = new Date(post.updated).toISOString().slice(0,10);
-        keys.created = "date";
-        keys.updated = "date";
-        for (let key of Object.keys(snaps.schema)) {
-          if (keys.hasOwnProperty(key))
-            keys[key] = "relation";
-          if (keys.hasOwnProperty(`${key}s`))
-            keys[`${key}s`] = "relation";
-        }
-        postData = post;
-        return { post, keys };
-      });
-      document.Reactions.define("get-id", url => (url.searchParams.get("post")));
-      document.Reactions.define("edit-post", async function(e) {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = {};
-        const types = this.ownerElement.parentElement.getAttribute("types").split(",");
-        for (let [key, value] of formData.entries()) {
-          if (value && value != postData[key]) 
-          data[key] = value;
-        }
-        for (let type of types) {
-          const key = `${type}s`; 
-          if (data.hasOwnProperty(key)) {
-            if (!data[key] && postData.hasOwnProperty(key)) 
-              data[key] = JSON.stringify(postData[key]);
-            data[key] = JSON.parse(data[key]);
-          } 
-        }
-        const response = await fetch("/api/event", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({...data, uid: formData.get("uid")})
-        });
-        
-        alert(response.ok ? "Edited": "Failed Editing...");
-      });
-      document.Reactions.define("select-in-other-tab", function(e) {
-        e.preventDefault();
-        const href = this.ownerElement.getAttribute("href");
-        window.open(href, "_blank");
-      });
-      document.Reactions.define("store-types", function({snaps}) {
-        this.ownerElement.setAttribute("types", Object.keys(snaps.schema));
-      });
-  </script>
+  <script type="module" src="/reactions.js"></script>
   <script>
     window.addEventListener("message", function(e) {
       if (location.origin !== e.origin) 
@@ -88,13 +29,13 @@
 <body class="$palette(#4f46e5) $flex(cc) $bg(#f9fafb)" 
   _::fetch_json:oi.value:er:state_snaps="/api/snap"
   nav:get-id:state_id
+  state_snaps_id:get-post-with-relation:state_post
 >
   <div template: style="box-shadow:0 4px 6px rgba(0, 0, 0, 0.1)" class="$w(min,100%,700px) $h(min) $bg(white) $padding(2rem) $font(helvetica,arial,'sans-serif',500,capitalize)" 
-    state_snaps_id:get-post:embrace
-    state_snaps:store-types
+    state_post:add-post-key:show-post:embrace
   >
     <h1 class="$block(c) $color(--primary,--primary)">Edit Post</h1>
-    <form submit:edit-post class="$flex(column,gap(1rem))">
+    <form post="{{JSON.stringify(post)}}" submit:prevent-default:formdata-json:form-diff:parse-relation:edit-post:alert class="$flex(column,gap(1rem))">
           <!-- <template for="key of keys"> -->
             <div class="|label$fontWeight(bold) |input,textarea$w(,100%,)$padding(.7rem)$margin(.5rem,0,0,0)$borderColor(#d1d5db)$border(solid,1px,radius(6px))">
               <!-- <template if="key === 'text'"> -->
@@ -131,7 +72,7 @@
               <!-- </template> -->
               <!-- <template if="key === 'relation'"> -->
               <label for="{{$key}}">{{$key}}:</label>
-              <input type="hidden" name="{{$key}}" references/>
+              <input type="hidden" name="{{$key}}" value="{{JSON.stringify(post[$key])}}" references/>
               <ul id="{{$key}}">
                 <!-- <template for="value of post[$key]"> -->
                   <li>{{value}}</li>
