@@ -14578,7 +14578,7 @@
     "json": {
       "type": "episode",
       "title": "Filmen bakom \"Å\"",
-      "fulltText": "\"Ravi er kjent for å eksperimentere med ulike uttrykk. Da ravisk ikke ble nok, forsøkte han seg på tegnspråk! Dette er bakomfilmen om musikkvideoen “Å”!",
+      "fulltext": "\"Ravi er kjent for å eksperimentere med ulike uttrykk. Da ravisk ikke ble nok, forsøkte han seg på tegnspråk! Dette er bakomfilmen om musikkvideoen “Å”!",
       "uid": "episode/filmen_bakom__aa_"
     }
   },
@@ -14590,7 +14590,7 @@
       "href": "https://www.youtube.com/embed/XFs2yDXoXLM",
       "videotitle": "Filmen bakom \"Å\"",
       "slug": "filmen_bakom__aa_",
-      "fulltText": "\"Ravi er kjent for å eksperimentere med ulike uttrykk. Da ravisk ikke ble nok, forsøkte han seg på tegnspråk! Dette er bakomfilmen om musikkvideoen “Å”!",
+      "fulltext": "\"Ravi er kjent for å eksperimentere med ulike uttrykk. Da ravisk ikke ble nok, forsøkte han seg på tegnspråk! Dette er bakomfilmen om musikkvideoen “Å”!",
       "uid": "episode/filmen_bakom__aa_"
     }
   },
@@ -14601,7 +14601,7 @@
     "json": {
       "type": "episode",
       "title": "Ravi - \"Å ft. Whims\"",
-      "fulltText": "Musikkvideoen “Å” – gjengitt her med tillatelse fra Ravi.",
+      "fulltext": "Musikkvideoen “Å” – gjengitt her med tillatelse fra Ravi.",
       "uid": "episode/sveve-litt-for-godt-1"
     }
   },
@@ -14613,7 +14613,7 @@
       "href": "https://www.youtube.com/embed/yL0o5sWQuDo",
       "videotitle": "Ravi - Å ft. Whims",
       "slug": "sveve-litt-for-godt-1",
-      "fulltText": "Musikkvideoen “Å” – gjengitt her med tillatelse fra Ravi.",
+      "fulltext": "Musikkvideoen “Å” – gjengitt her med tillatelse fra Ravi.",
       "uid": "episode/sveve-litt-for-godt-1"
     }
   },
