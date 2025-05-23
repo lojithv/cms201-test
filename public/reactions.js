@@ -71,3 +71,46 @@ document.Reactions.define("selected", function(key) {
     window.opener.postMessage({ type: "image", data: { key, imageURL: src } }, location.origin);
     window.close();
 });
+document.Reactions.define("form-diff", function(newPost) {
+    const diff = {};
+    const oldPost = JSON.parse(this.ownerElement.getAttribute("post")); 
+    for (let [k,v1] of Object.entries(newPost)) {
+        const old = oldPost[k]; 
+        const v2  = typeof old === "object" ? JSON.stringify(old) : old;
+        if (!v1 && !oldPost.hasOwnProperty(k))
+            continue;
+        if (v1 !== v2)
+            diff[k] = v1;
+    }
+    return diff;
+});
+document.Reactions.define("parse-relation", function (diff) {
+    if (Object.keys(diff).length === 0)
+        return document.Reactions.break;
+    const oldPost = JSON.parse(this.ownerElement.getAttribute("post"));
+    for (let key in diff)
+        if (typeof oldPost[key] === "object")
+        diff[key] = JSON.parse(diff[key]);
+    return diff;
+});
+document.Reactions.define("edit-post", async function(data) {
+    if (!data) 
+        return "Nothing is Updated!";
+    const oldPost = JSON.parse(this.ownerElement.getAttribute("post"));
+    const response = await fetch("/api/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({...data, uid: oldPost.uid})
+    });
+    return response.ok ? "Edited": "Failed Editing...";
+});
+document.Reactions.define("alert", (msg) => alert(msg));
+document.Reactions.define("select-in-other-tab", function(e) {
+    e.preventDefault();
+    const href = this.ownerElement.getAttribute("href");
+    window.open(href, "_blank");
+});
+document.Reactions.define("formdata-json", function() {
+    const formdata = new FormData(this.ownerElement);
+    return Object.fromEntries(formdata.entries());
+});
