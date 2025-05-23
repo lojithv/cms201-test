@@ -4,8 +4,8 @@ const stringTemplate = (pattern, ...args) => args.reduce((p, v, i) => p.replaceA
 const er = i => new ErAnalysis(i);
 const getId = url => (url.searchParams.get("post"));
 const getKey = _ => (new URL(location.href).searchParams.get("key"));
-const getPost = ({snaps, id}) => snaps?.[id] ? snaps[id] : document.Reactions.break;
-const getPostWithRelation = ({snaps, id}) => snaps?.posts?.[id] ? snaps.posts[id] : document.Reactions.break;
+const getPost = ({snaps, id}) => snaps?.[id] ? snaps[id] : EventLoop.Break;
+const getPostWithRelation = ({snaps, id}) => snaps?.posts?.[id] ? snaps.posts[id] : EventLoop.Break;
 const addPostKey = ({ snaps, post }) => {
     const { email, ...keys } = snaps.schema[post.type];
     return { post, keys };
@@ -21,7 +21,7 @@ const diff = ({ relation, postkeytype }) => {
 };
 const saveReferences = function(key) {
     if (!window.opener)
-        return document.Reactions.break;
+        return EventLoop.Break;
     const droppable = document.querySelector(".droppable");
     const draggables = droppable.querySelectorAll(".draggable");
     let references = [];
@@ -64,7 +64,7 @@ const shrinkAll = (e) => {
 function grow() { this.ownerElement.classList.add("focused") };    
 function selected(key) {
     if (!window.opener) 
-        return document.Reactions.break;
+        return EventLoop.Break;
     const src = this.ownerElement.getAttribute("src");
     window.opener.postMessage({ type: "image", data: { key, imageURL: src } }, location.origin);
     window.close();
@@ -84,7 +84,7 @@ function formDiff(newPost) {
 };
 function parseRelation (diff) {
     if (Object.keys(diff).length === 0)
-        return document.Reactions.break;
+        return EventLoop.Break;
     const oldPost = JSON.parse(this.ownerElement.getAttribute("post"));
     for (let key in diff)
         if (typeof oldPost[key] === "object")
@@ -92,8 +92,6 @@ function parseRelation (diff) {
     return diff;
 };
 async function editPost(data) {
-    if (!data) 
-        return "Nothing is Updated!";
     const oldPost = JSON.parse(this.ownerElement.getAttribute("post"));
     const response = await fetch("/api/event", {
         method: "POST",
