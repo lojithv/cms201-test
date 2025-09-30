@@ -35,6 +35,14 @@ const PATHS = {
 	},
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
+		let state;
+		if (req.url.pathname.startsWith("/auth/login")) {
+			const referrer = req.headers.get("Referer");
+			state = referrer && referrer.startsWith(req.url.origin) ?
+				referrer :
+				"/";
+		} else
+			state = req.url;
 		const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
 			new URLSearchParams({
 				client_id,
@@ -43,6 +51,7 @@ const PATHS = {
 				scope: "openid email profile",
 				access_type: "online",
 				prompt: "consent",
+				state,
 			});
 		return Response.redirect(oauthUrl, 302);
 	},
@@ -57,6 +66,7 @@ const PATHS = {
 	},
 	"GET /auth/callback": async function (req, env, ctx) {
 		const code = req.url.searchParams.get("code");
+		const state = req.url.searchParams.get("state");
 		const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -69,13 +79,11 @@ const PATHS = {
 		if (!tokenRes.ok)
 			return new Response(`Authentication Failed!`, { status: 401 });
 		const tokenData = await tokenRes.json();
-		return new Response("ok. Authentication success!", {
-			status: 200,
-			headers: {
-				"Set-Cookie": `session_token=${tokenData.id_token}; HttpOnly; Secure; Path=/; Max-Age=7200; SameSite=Lax`,
-				"Content-Type": "text/html",
-			},
-		});
+		const headers = {
+			"Location": state || "/",
+			"Set-Cookie": `session_token=${tokenData.id_token}; HttpOnly; Secure; Path=/; Max-Age=7200; SameSite=Lax`,
+		};
+		return new Response(null, { status: 302, headers });
 	}
 };
 
@@ -182,12 +190,18 @@ async function onFetch(request, env, ctx) {
 					endPoint = PATHS["GET /auth/login"]; //?redirect=" + encodeURIComponent(request.url)
 			}
 		}
+		
+		// If no endpoint found, try to serve static assets
+		if (!endPoint) {
+			return env.ASSETS.fetch(request);
+		}
+		
 		let res = endPoint(request, env, ctx, user);
 		if (res instanceof Promise)
 			res = await res;
 		return res instanceof Response ? res :
 			(typeof res === "string") ? new Response(res) :
-				new Response(JSON.stringify(res), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", } });
+				new Response(JSON.stringify(res), { status: 500, headers: { "Content-Type": "application/json", } });
 	} catch (error) {
 		console.log(error, request.url);
 		// we can store the errors in the durable object?
