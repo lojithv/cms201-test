@@ -1,1 +1,15 @@
 form with the entry that can be edited manually.
+
+<form action="/api/upsert">
+  <input type="text" value="entryKey"/>
+  <textarea>
+    {
+      prop1: "value1",
+      prop2: "value2",
+    }
+  </textarea>
+</form>
+
+<script>
+  document.querySelector("input").value = location.pathname.split("/").pop();
+</script>
