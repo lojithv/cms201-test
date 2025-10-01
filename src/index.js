@@ -4,7 +4,7 @@ export { EventsSnaps } from "./EventSnapsDO.js";
 const getDo = (clazz, name, env) => env[clazz].get(env[clazz].idFromName(name));
 const DB = env => getDo("EVENTS_SNAPS", "foo", env);
 
-const PATHS = {
+const UNSECURE_SAME_SITE_PATHS = {
 	"GET /api/events": async function (req, env, ctx) {
 		return await DB(env).getEvents();
 	},
@@ -33,6 +33,9 @@ const PATHS = {
 		}
 		return imgURLs;
 	},
+};
+
+const UNSECURE_PATHS = {
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
 		const state = req.url.pathname == "/auth/login" ? "/" :
@@ -176,7 +179,12 @@ async function onFetch(request, env, ctx) {
 	try {
 		env.settings ??= parseSettings(env);
 		Object.defineProperty(request, "url", { value: new URL(request.url) });
-		let endPoint = getEndpoint(request, PATHS);
+		let endPoint = getEndpoint(request, UNSECURE_PATHS);
+		if (!endPoint) {  //validate that checking CORS manually for api endpoints like this is ok
+			endPoint = getEndpoint(request, UNSECURE_SAME_SITE_PATHS);
+			if (endPoint && !request.headers.get("Referer")?.startsWith(request.url.origin))
+				throw "CORS error: Referer not same site";
+		}									//validate end
 		let user;
 		if (!endPoint) {
 			endPoint = getEndpoint(request, SECURE_PATHS);
@@ -186,8 +194,7 @@ async function onFetch(request, env, ctx) {
 					payload = await payload;
 				user = payload?.email;
 				if (!user)
-					// return new Response(null, { status: 302, headers: { "Location": "/auth/login", "Referer": request.url.href } });
-					endPoint = PATHS["GET /auth/login"]; //?redirect=" + encodeURIComponent(request.url)
+					endPoint = UNSECURE_PATHS["GET /auth/login"];
 			}
 		}
 		if (!endPoint)
@@ -199,7 +206,6 @@ async function onFetch(request, env, ctx) {
 		return res instanceof Response ? res :
 			(typeof res === "string") ? new Response(res) :
 				new Response(JSON.stringify(res), { status: 500, headers: { "Content-Type": "application/json", } });
-		//, "Access-Control-Allow-Origin": "*" } });
 	} catch (error) {
 		console.log(error, request.url); // we can store the errors in the durable object?
 		return new Response(`Error. ${Date.now()}.`, { status: 500 });//or, redirect to frontPage always??
