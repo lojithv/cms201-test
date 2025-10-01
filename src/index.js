@@ -12,14 +12,14 @@ const PATHS = {
 		const name = req.url.searchParams.get("name");
 		return await DB(env).getSnap(name);
 	},
-	"GET /api/uploaded-images": async function(req, env, ctx) {
+	"GET /api/uploaded-images": async function (req, env, ctx) {
 		const { image_server: { account_id, api_token } } = env.settings;
 		// required paginating to retrieve all images in cloudfare images (100 imgs/page default)
 		let page = 1;
 		let imgURLs = [];
 		while (true) {
 			const url = `https://api.cloudflare.com/client/v4/accounts/${account_id}/images/v1?page=${page}`;
-			const response = await fetch(url, {headers: { "Authorization": `Bearer ${api_token}` }});
+			const response = await fetch(url, { headers: { "Authorization": `Bearer ${api_token}` } });
 			if (!response.ok)
 				break;
 			const { images } = (await response.json()).result;
@@ -35,15 +35,10 @@ const PATHS = {
 	},
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
-		let state;
-		if (req.url.pathname.startsWith("/auth/login")) {
-			const referrer = req.headers.get("Referer");
-			state = referrer && referrer.startsWith(req.url.origin) ?
-				referrer :
-				"/";
-		} else
-			state = req.url;
-		const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+		const referrer = req.headers.get("Referer");
+		const state = referrer?.startsWith(req.url.origin) ? referrer : "/";
+
+		return Response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?` +
 			new URLSearchParams({
 				client_id,
 				redirect_uri,
@@ -52,8 +47,7 @@ const PATHS = {
 				access_type: "online",
 				prompt: "consent",
 				state,
-			});
-		return Response.redirect(oauthUrl, 302);
+			}), 302);
 	},
 	"GET /auth/logout": function (req, env, ctx) {
 		return new Response("ok. Logged out.", {
@@ -66,7 +60,8 @@ const PATHS = {
 	},
 	"GET /auth/callback": async function (req, env, ctx) {
 		const code = req.url.searchParams.get("code");
-		const state = req.url.searchParams.get("state");
+		const state = req.url.searchParams.get("state") || "/";
+
 		const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -79,15 +74,20 @@ const PATHS = {
 		if (!tokenRes.ok)
 			return new Response(`Authentication Failed!`, { status: 401 });
 		const tokenData = await tokenRes.json();
-		const headers = {
-			"Location": state || "/",
-			"Set-Cookie": `session_token=${tokenData.id_token}; HttpOnly; Secure; Path=/; Max-Age=7200; SameSite=Lax`,
-		};
-		return new Response(null, { status: 302, headers });
+		//todo doesn't the tokenData contain the state too? should we not read it from there?
+		return new Response(null, {
+			status: 302, headers: {
+				"Location": state,
+				"Set-Cookie": `session_token=${tokenData.id_token}; HttpOnly; Secure; Path=/; Max-Age=7200; SameSite=Lax`,
+			}
+		});
 	}
 };
 
 const SECURE_PATHS = {
+	"GET /admin/": function (req, env, ctx, user) {
+		return env.ASSETS.fetch(req);
+	},
 	"POST /api/event": async function (req, env, ctx, user) {
 		const json = await req.json();
 		return await DB(env).addEvent(user, json);
@@ -190,22 +190,19 @@ async function onFetch(request, env, ctx) {
 					endPoint = PATHS["GET /auth/login"]; //?redirect=" + encodeURIComponent(request.url)
 			}
 		}
-		
-		// If no endpoint found, try to serve static assets
-		if (!endPoint) {
-			return env.ASSETS.fetch(request);
-		}
-		
+		if (!endPoint)
+			throw "no endPoint found";
+
 		let res = endPoint(request, env, ctx, user);
 		if (res instanceof Promise)
 			res = await res;
 		return res instanceof Response ? res :
 			(typeof res === "string") ? new Response(res) :
 				new Response(JSON.stringify(res), { status: 500, headers: { "Content-Type": "application/json", } });
+				//, "Access-Control-Allow-Origin": "*" } });
 	} catch (error) {
-		console.log(error, request.url);
-		// we can store the errors in the durable object?
-		return new Response(`Error. ${Date.now()}.`, { status: 500 });
+		console.log(error, request.url); // we can store the errors in the durable object?
+		return new Response(`Error. ${Date.now()}.`, { status: 500 });//or, redirect to frontPage always??
 	}
 }
 
