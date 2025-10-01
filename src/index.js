@@ -35,8 +35,8 @@ const PATHS = {
 	},
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
-		const referrer = req.headers.get("Referer");
-		const state = referrer?.startsWith(req.url.origin) ? referrer : "/";
+		const state = req.url.pathname == "/auth/login" ? "/" :
+			req.url.pathname;
 
 		return Response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?` +
 			new URLSearchParams({
@@ -186,8 +186,8 @@ async function onFetch(request, env, ctx) {
 					payload = await payload;
 				user = payload?.email;
 				if (!user)
-					return new Response(null, { status: 302, headers: { "Location": "/auth/login" } });
-				// endPoint = PATHS["GET /auth/login"]; //?redirect=" + encodeURIComponent(request.url)
+					// return new Response(null, { status: 302, headers: { "Location": "/auth/login", "Referer": request.url.href } });
+					endPoint = PATHS["GET /auth/login"]; //?redirect=" + encodeURIComponent(request.url)
 			}
 		}
 		if (!endPoint)
