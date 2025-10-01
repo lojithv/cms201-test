@@ -1,98 +1,20 @@
-// External dependencies
 import { getAuthGoogleUser } from "./googleAuth.js";
-
-// Internal module exports
 export { EventsSnaps } from "./EventSnapsDO.js";
 
-// === UTILITY FUNCTIONS ===
-/**
- * Get Durable Object instance by class name and identifier
- * @param {string} clazz - The Durable Object class name
- * @param {string} name - The identifier for the DO instance
- * @param {Object} env - Environment bindings
- * @returns {Object} Durable Object instance
- */
 const getDo = (clazz, name, env) => env[clazz].get(env[clazz].idFromName(name));
-
-/**
- * Get database instance (EventsSnaps Durable Object)
- * @param {Object} env - Environment bindings
- * @returns {Object} EventsSnaps DO instance
- */
 const DB = env => getDo("EVENTS_SNAPS", "foo", env);
 
-/**
- * Extract cookie value from request headers
- * @param {Request} request - The incoming request
- * @param {string} name - Cookie name to extract
- * @returns {string|null} Cookie value or null if not found
- */
-function getCookie(request, name) {
-	return request.headers.get("Cookie")
-		?.split(";")
-		.map(c => c.trim().split("="))
-		.findLast(c => c[0] === name)?.[1] || null;
-}
-
-// === CORS UTILITIES ===
-/**
- * Validate if origin is allowed based on CORS configuration
- * @param {string} origin - Request origin
- * @param {Array<string>} allowedOrigins - List of allowed origins
- * @returns {boolean} True if origin is allowed
- */
-function validateOrigin(origin, allowedOrigins) {
-	if (!origin || !allowedOrigins.length) return false;
-	return allowedOrigins.some(allowed => {
-		// Exact match
-		if (allowed === origin) return true;
-		// Subdomain match (e.g., *.example.com)
-		if (allowed.startsWith('*.')) {
-			const domain = allowed.slice(2);
-			return origin.endsWith('.' + domain) || origin === domain;
-		}
-		return false;
-	});
-}
-
-/**
- * Set CORS headers on response if origin is allowed
- * @param {Response} response - Response object to modify
- * @param {string} origin - Request origin
- * @param {Array<string>} allowedOrigins - List of allowed origins
- * @returns {Response} Modified response with CORS headers
- */
-function setCorsHeaders(response, origin, allowedOrigins) {
-	if (validateOrigin(origin, allowedOrigins)) {
-		response.headers.set('Access-Control-Allow-Origin', origin);
-		response.headers.set('Access-Control-Allow-Credentials', 'true');
-		response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-		response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-	}
-	return response;
-}
-
-// === ROUTING CONFIGURATION ===
-/**
- * Public endpoints - no authentication required
- */
 const PATHS = {
-	"OPTIONS": function (req, env, ctx) {
-		const origin = req.headers.get('Origin');
-		const response = new Response(null, { status: 204 });
-		return setCorsHeaders(response, origin, env.settings.cors.allowedOrigins);
-	},
 	"GET /api/events": async function (req, env, ctx) {
 		return await DB(env).getEvents();
 	},
 	"GET /api/snap": async function (req, env, ctx) {
 		const name = req.url.searchParams.get("name");
-		const snap = await DB(env).getSnap(name);
-		return snap?.value || {};
+		return await DB(env).getSnap(name);
 	},
 	"GET /api/uploaded-images": async function(req, env, ctx) {
 		const { image_server: { account_id, api_token } } = env.settings;
-		// Required paginating to retrieve all images in Cloudflare Images (100 imgs/page default)
+		// required paginating to retrieve all images in cloudfare images (100 imgs/page default)
 		let page = 1;
 		let imgURLs = [];
 		while (true) {
@@ -165,13 +87,24 @@ const PATHS = {
 	}
 };
 
-/**
- * Authenticated endpoints - requires valid user session
- */
 const SECURE_PATHS = {
 	"POST /api/event": async function (req, env, ctx, user) {
 		const json = await req.json();
 		return await DB(env).addEvent(user, json);
+	},
+	"POST /api/requestRollback": async function (req, env, ctx, user) {
+		const newEvents = await req.json();
+		await DB(env).requestRollback(newEvents, req.url.origin, env.settings);
+		return "ok. rollback requested."
+	},
+	"GET /api/confirmRollback": async function (req, env, ctx, user) {
+		const id = req.url.searchParams.get("id");
+		await DB(env).confirmRollback(id, req.url.origin, env.settings);
+		return "ok. rollback executed.";
+	},
+	"GET /api/backup": async function (req, env, ctx, user) {
+		await DB(env).backup(env.settings);
+		return "ok. backup created.";
 	},
 	"GET /auth/checkLogin": async function (req, env, ctx, user) {
 		return "ok. Already authenticated.";
@@ -198,45 +131,6 @@ const SECURE_PATHS = {
 	},
 };
 
-/**
- * Super user endpoints - requires admin privileges
- */
-const SUPER_PATHS = {
-	"POST /api/requestRollback": async function (req, env, ctx, user) {
-		const newEvents = await req.json();
-		await DB(env).requestRollback(newEvents, req.url.origin, env.settings);
-		return "ok. rollback requested."
-	},
-	"GET /api/confirmRollback": async function (req, env, ctx, user) {
-		const id = req.url.searchParams.get("id");
-		await DB(env).confirmRollback(id, req.url.origin, env.settings);
-		return "ok. rollback executed.";
-	},
-	"GET /api/backup": async function (req, env, ctx, user) {
-		await DB(env).backup(env.settings);
-		return "ok. backup created.";
-	},
-};
-
-/**
- * Static asset endpoints
- */
-const ASSETS_PATHS = {
-	"GET /admin/": async function (req, env) {
-		return env.ASSETS.fetch(new Request(`${req.url.origin}/admin/`, req.headers));
-	},
-	"GET /": async function (req, env) {
-		return env.ASSETS.fetch(new Request(`${req.url.origin}/`, req.headers));
-	}
-};
-
-// === ROUTING LOGIC ===
-/**
- * Find endpoint handler in specified path configuration
- * @param {Request} req - The incoming request
- * @param {Object} PATHS - Path configuration object
- * @returns {Function|undefined} Endpoint handler function or undefined
- */
 function getEndpoint(req, PATHS) {
 	const path = req.method + " " + req.url.pathname;
 	for (let key in PATHS)
@@ -244,61 +138,22 @@ function getEndpoint(req, PATHS) {
 			return PATHS[key];
 }
 
-/**
- * Find appropriate endpoint and determine authentication requirements
- * @param {Request} req - The incoming request
- * @returns {Object} Object containing endpoint and auth requirements
- */
-function findEndPoint(req) {
-	let endPoint;
-	if (endPoint = getEndpoint(req, PATHS))
-		return { endPoint };
-	if (endPoint = getEndpoint(req, SECURE_PATHS))
-		return { endPoint, needsUser: true };
-	if (endPoint = getEndpoint(req, SUPER_PATHS))
-		return { endPoint, needsUser: true, needsSuperUser: true };
-	if (req.url.pathname.startsWith("/admin/"))
-		return { endPoint: ASSETS_PATHS["GET /admin/"], needsUser: true };
-	return { endPoint: ASSETS_PATHS["GET /"] };
-}
-
-/**
- * Validate endpoint access and return appropriate handler
- * @param {Function} endPoint - The endpoint handler function
- * @param {Object} env - Environment bindings
- * @param {string} user - Authenticated user email
- * @param {Object} options - Authentication requirements
- * @returns {Function} Final endpoint handler
- */
-function checkEndpoint(endPoint, env, user, { needsSuperUser, needsUser }) {
-	if (needsUser && !user)
-		return PATHS["GET /auth/login"];
-	if (needsSuperUser && !env.settings.backup.emails.includes(user))
-		throw new Error("Unauthorized. Admin user rights required.");
-	return endPoint;
-}
-
-// === SETTINGS MANAGEMENT ===
-/**
- * Parse and validate environment variables into structured settings
- * @param {Object} env - Environment bindings
- * @returns {Object} Structured settings object with defaults and validation
- */
 function parseSettings(env) {
 	return {
 		resend: env.RESEND,
 		domain: env.DOMAIN,
 		backup: {
 			full: {
-				time: Number(env.BACKUP_FULLTIME || 7) * 24 * 3600000, // Default 7 days
-				events: Number(env.BACKUP_FULLEVENTS || 1000), // Default 1000 events
+				time: Number(env.BACKUP_FULLTIME) * 24 * 3600000,
+				events: env.BACKUP_FULLEVENTS,
 			},
 			partial: {
-				time: Number(env.BACKUP_PARTIALTIME || 1) * 24 * 3600000, // Default 1 day
-				events: Number(env.BACKUP_PARTIALEVENTS || 100), // Default 100 events
+				time: Number(env.BACKUP_PARTIALTIME) * 24 * 3600000,
+				events: env.BACKUP_PARTIALEVENTS,
 			},
-			emails: (env.BACKUP_EMAILS || "").split(";").filter(email => email.trim())
+			emails: env.BACKUP_EMAILS.split(";")
 		},
+		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
 		google: {
 			client_id: env.GOOGLE_ID,
 			client_secret: env.GOOGLE_SECRET,
@@ -307,83 +162,58 @@ function parseSettings(env) {
 		image_server: {
 			account_id: env.IMAGE_SERVER_ACCOUNT_ID,
 			api_token: env.IMAGE_SERVER_API_TOKEN
-		},
-		cors: {
-			allowedOrigins: (env.CORS_ALLOWED_ORIGINS || "").split(",").filter(origin => origin.trim())
 		}
 	};
 }
 
-// === MAIN HANDLERS ===
-/**
- * Main fetch handler for incoming requests
- * @param {Request} request - The incoming request
- * @param {Object} env - Environment bindings
- * @param {Object} ctx - Execution context
- * @returns {Response} HTTP response
- */
+function getCookie(request, name) {
+	return request.headers.get("Cookie")
+		?.split(";")
+		.map(c => c.trim().split("="))
+		.findLast(c => c[0] === name)?.[1] || null;
+}
+
 async function onFetch(request, env, ctx) {
 	try {
-		// Initialize settings if not already parsed
 		env.settings ??= parseSettings(env);
-		
-		// Enhance request object with URL parsing
 		Object.defineProperty(request, "url", { value: new URL(request.url) });
-		
-		// Determine endpoint and authentication requirements
-		const { endPoint, needsUser, needsSuperUser } = findEndPoint(request);
+		let endPoint = getEndpoint(request, PATHS);
 		let user;
-		
-		// Handle authentication if required
-		if (needsUser) {
-			let payload = getAuthGoogleUser(getCookie(request, "session_token"), env.settings);
-			if (payload instanceof Promise)
-				payload = await payload;
-			user = payload?.email;
+		if (!endPoint) {
+			endPoint = getEndpoint(request, SECURE_PATHS);
+			if (endPoint) {
+				let payload = getAuthGoogleUser(getCookie(request, "session_token"), env.settings);
+				if (payload instanceof Promise)
+					payload = await payload;
+				user = payload?.email;
+				if (!user)
+					endPoint = PATHS["GET /auth/login"]; //?redirect=" + encodeURIComponent(request.url)
+			}
 		}
 		
-		// Validate permissions and get final endpoint
-		const finalEndPoint = checkEndpoint(endPoint, env, user, { needsSuperUser, needsUser });
+		// If no endpoint found, try to serve static assets
+		if (!endPoint) {
+			return env.ASSETS.fetch(request);
+		}
 		
-		// Execute endpoint handler
-		let res = finalEndPoint(request, env, ctx, user);
+		let res = endPoint(request, env, ctx, user);
 		if (res instanceof Promise)
 			res = await res;
-		
-		// Normalize response format
-		const origin = request.headers.get('Origin');
-		let response = res instanceof Response ? res :
+		return res instanceof Response ? res :
 			(typeof res === "string") ? new Response(res) :
-				new Response(JSON.stringify(res), { headers: { "Content-Type": "application/json", } });
-		
-		// Apply CORS headers if origin is present
-		if (origin) {
-			response = setCorsHeaders(response, origin, env.settings.cors.allowedOrigins);
-		}
-		
-		return response;
+				new Response(JSON.stringify(res), { status: 500, headers: { "Content-Type": "application/json", } });
 	} catch (error) {
 		console.log(error, request.url);
-		// Return generic error response for security
+		// we can store the errors in the durable object?
 		return new Response(`Error. ${Date.now()}.`, { status: 500 });
 	}
 }
 
-/**
- * Scheduled event handler for automated tasks
- * @param {Object} controller - Scheduled event controller
- * @param {Object} env - Environment bindings
- * @param {Object} ctx - Execution context
- */
 async function onSchedule(controller, env, ctx) {
 	env.settings = parseSettings(env);
 	await DB(env).backup(env.settings);
 }
 
-// === MODULE EXPORTS ===
-/**
- * Default export - Cloudflare Worker entry point
- */
 export default {
 	fetch: onFetch,
 	scheduled: onSchedule,
