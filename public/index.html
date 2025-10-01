@@ -8,8 +8,8 @@
 	</ul>
 	<pre>here comes the content of the durable object</pre>
 	<script type="module">
-		(async function(){
-			const res = await fetch("/api/list");
+		(async function () {
+			const res = await fetch("/api/snap");
 			const data = await res.json();
 			document.querySelector("pre").textContent = JSON.stringify(data, null, 2);
 		})();
