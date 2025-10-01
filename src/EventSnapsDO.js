@@ -40,8 +40,7 @@ export class EventsSnaps extends DurableObject {
     return this.sql.exec("SELECT * FROM events ORDER BY id DESC LIMIT 1").next().value?.id;
   }
 
-  getSnap(name) {
-    name ||= "all"
+  getSnap(name = "all") {
     const res = this.sql.exec(`SELECT * FROM snaps WHERE name = ?`, name).next().value;
     if (res) res.value = JSON.parse(res.value);
     return res;
