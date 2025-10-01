@@ -5,15 +5,35 @@
 	<ul>
 		<li><a href="/auth/login">Log in</a></li>
 		<li><a href="/auth/logout">Log out</a></li>
+		<li><a href="/api/snap">snap</a></li>
+		<li><a href="/api/events">events</a></li>
 	</ul>
-	<pre>here comes the content of the durable object</pre>
-	<script type="module">
-		(async function () {
-			const res = await fetch("/api/snap");
-			const data = await res.json();
-			document.querySelector("pre").textContent = JSON.stringify(data, null, 2);
-		})();
-	</script>
+	//you can turn the snap and events into iframes with scrollbars if you would like.
+
+
+	<h2>format of data</h2>
+	<pre>
+	1. The db is just a loooong sequence of events.
+
+	2. Each event has the form
+	```js
+	{ 
+		key1: {prop: "with primitive data" },
+	  key2: {prop2: 42 },
+	}
+	```
+
+	3. a snap is a Object.assignAssign() of all the events in the db, fifo.
+	```js
+  function Object.assignAssign(...objs) {
+		const result = {};
+		for (const obj of objs)
+			for (const [k,v] of Object.entries(obj)) 
+				Object.assign(result[k] ?? {}, v);
+		return result;
+	}
+	```
+  </pre>
 </body>
 
 </html>
