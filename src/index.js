@@ -50,12 +50,11 @@ const PATHS = {
 			}), 302);
 	},
 	"GET /auth/logout": function (req, env, ctx) {
-		return new Response("ok. Logged out.", {
-			status: 200,
-			headers: {
-				"Set-Cookie": `session_token=; HttpOnly; Secure; Path=/; Max-Age=0; SameSite=Lax`,
+		return new Response(null, {
+			status: 302, headers: {
 				"Location": "/",
-			},
+				"Set-Cookie": `session_token=; HttpOnly; Secure; Path=/; Max-Age=0; SameSite=Lax`,
+			}
 		});
 	},
 	"GET /auth/callback": async function (req, env, ctx) {
@@ -187,7 +186,8 @@ async function onFetch(request, env, ctx) {
 					payload = await payload;
 				user = payload?.email;
 				if (!user)
-					endPoint = PATHS["GET /auth/login"]; //?redirect=" + encodeURIComponent(request.url)
+					return new Response(null, { status: 302, headers: { "Location": "/auth/login" } });
+				// endPoint = PATHS["GET /auth/login"]; //?redirect=" + encodeURIComponent(request.url)
 			}
 		}
 		if (!endPoint)
@@ -199,7 +199,7 @@ async function onFetch(request, env, ctx) {
 		return res instanceof Response ? res :
 			(typeof res === "string") ? new Response(res) :
 				new Response(JSON.stringify(res), { status: 500, headers: { "Content-Type": "application/json", } });
-				//, "Access-Control-Allow-Origin": "*" } });
+		//, "Access-Control-Allow-Origin": "*" } });
 	} catch (error) {
 		console.log(error, request.url); // we can store the errors in the durable object?
 		return new Response(`Error. ${Date.now()}.`, { status: 500 });//or, redirect to frontPage always??
