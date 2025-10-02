@@ -1,3 +1,3 @@
 # cms201
 
-`npx wrangler dev` to run locally!
+`npx wrangler dev --port 3033` to run locally!

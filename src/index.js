@@ -152,8 +152,8 @@ function parseSettings(env) {
 				time: Number(env.BACKUP_PARTIALTIME) * 24 * 3600000,
 				events: env.BACKUP_PARTIALEVENTS,
 			},
-			to: env.BACKUP_EMAILS.split(";").map(email => ({ email })), //todo rename BACKUP_EMAILS to BACKUP_EMAIL_TO??
-			from: { email: "noreply@your-domain.com", name: "CMS Backup Service" }, //env.BACKUP_EMAIL_FROM??
+			to: env.BACKUP_EMAIL_TO.split(";").map(email => ({ email })),
+			from: { email: env.BACKUP_EMAIL_FROM, name: "Auto Backup Service" },
 		},
 		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
 		google: {
