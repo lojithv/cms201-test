@@ -1,15 +1,35 @@
 import { DurableObject } from "cloudflare:workers";
-// import { ResendEmail } from "./resendEmail.js";
-import { CloudFlareEmail } from "./cloudFlareEmail.js";
 import { AesGcmHelper } from "./AesGcmHelper.js";
+
+/*EMAIL*/
+async function strToZipBase64(str) {
+  const cs = new CompressionStream('gzip');
+  const writer = cs.writable.getWriter();
+  writer.write(new TextEncoder().encode(str));
+  writer.close();
+  const buff = await new Response(cs.readable).arrayBuffer();
+  const compressed = new Uint8Array(buff);
+  return btoa(String.fromCharCode(...compressed));
+}
+
+function timestamp() {
+  return new Date().toISOString().replaceAll(/[:-]/g, "").replaceAll("T", "_").slice(2, 13);
+}
+
+async function makeAttachments(content, timestamp = timestamp()) {
+  return [{
+    filename: `backup_domain_${timestamp}.json.gz`,
+    content: await strToZipBase64(content)
+  }];
+}
+/*EMAIL END*/
 
 
 export class EventsSnaps extends DurableObject {
 
   constructor(ctx, env) {
     super(ctx, env);
-    // this.resend = new ResendEmail(env.RESEND);
-    this.email = new CloudFlareEmail(env.SEND_EMAIL); // use cloudflare
+    this.emailBinding = env.SEND_EMAIL;
     this.sql = this.ctx.storage.sql;
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS events (
@@ -98,7 +118,7 @@ export class EventsSnaps extends DurableObject {
 
   async requestRollback(newEvents, host, settings) {
     EventsSnaps.validateEvents(newEvents);
-    const { domain, backup: { emails } } = settings;
+    const { domain, backup: { to, from } } = settings;
     const lastId = this.getLastEventId();
     const data = {
       random: Math.random(),
@@ -110,13 +130,18 @@ export class EventsSnaps extends DurableObject {
     const aes = await this.getAes();
     const encrypted = await aes.encryptAsJSON(data);
     const link = host + "/api/confirmRollback?id=" + encodeURIComponent(encrypted);
-    // await this.resend.confirmRollbackEmail(domain, emails, link, JSON.stringify(this.getEvents()));
-    await this.email.confirmRollbackEmail(domain, emails, link, JSON.stringify(this.getEvents()));
+    const timestamp = timestamp();
+    await this.emailBinding.send({
+      to, from,
+      subject: `rollback confirmation ${domain} at ${timestamp}`,
+      html: `please review this backup, click this link to continue to rollback: <a href="${link}">${link}</a>`,
+      attachments: makeAttachments(JSON.stringify(this.getEvents()), timestamp),
+    });
     this.upsertSnap("full", 1, lastId);
   }
 
   async confirmRollback(string, host, settings) {
-    const { domain, backup: { emails } } = settings;
+    const { domain, backup: { to, from } } = settings;
     function checkIfValid({ random, timestamp, lastId }, snap) {
       if (!snap)
         throw "no rollback snap, already rolled back.";
@@ -129,30 +154,42 @@ export class EventsSnaps extends DurableObject {
     const aes = await this.getAes();
     const decrypt = await aes.decryptAsJSON(string);
     const rollbackSnap = checkIfValid(decrypt, this.getSnap("rollback")?.value);
-    const addedEvents = this.getEvents(rollbackSnap.lastId);
-    // await this.resend.backupEmail(domain, emails, JSON.stringify(addedEvents), "rollback");
-    await this.email.backupEmail(domain, emails, JSON.stringify(addedEvents), "rollback");
+    const timestamp = timestamp();
+    await this.emailBinding.send({
+      to, from,
+      subject: `rollback backup ${domain} at ${timestamp}`,
+      html: "",
+      attachments: makeAttachments(JSON.stringify(this.getEvents(rollbackSnap.lastId)), timestamp)
+    });
     this.rebuild([...rollbackSnap.newEvents, ...addedEvents]);
   }
 
   async backup(settings) {
-    const { domain, backup: { full, partial, emails } } = settings;
+    const { domain, backup: { full, partial, to, from } } = settings;
     const newestEventId = this.getLastEventId();
     const lastFullBackup = this.getSnap("full");
     const fullDuration = Date.now() - (lastFullBackup?.timestamp ?? 0);
     const unsafeEventCount = newestEventId - (lastFullBackup?.eventId ?? 0);
 
+    const timestamp = timestamp();
+    const html = "";
     if (fullDuration > full.time || unsafeEventCount > full.events) {
-      // await this.resend.backupEmail(domain, emails, JSON.stringify(this.getEvents()), "full");
-      await this.email.backupEmail(domain, emails, JSON.stringify(this.getEvents()), "full");
+      await this.emailBinding.send({
+        to, from, html,
+        subject: `full ${subject} backup ${domain} at ${timestamp}`,
+        attachments: await makeAttachments(JSON.stringify(this.getEvents()), timestamp()),
+      });
       return this.upsertSnap("full", 1, newestEventId);
     }
 
     const lastPartialBackup = this.getSnap("partial");
     const partialDuration = Date.now() - (lastPartialBackup?.timestamp ?? 0);
     if (partialDuration > partial.time && unsafeEventCount > partial.events) {
-      // await this.resend.backupEmail(domain, emails, JSON.stringify(this.getEvents(lastFullBackup?.eventId)), "partial");
-      await this.email.backupEmail(domain, emails, JSON.stringify(this.getEvents(lastFullBackup?.eventId)), "partial");
+      await this.emailBinding.send({
+        to, from, html,
+        subject: `partial backup ${domain} at ${timestamp}`,
+        attachments: await makeAttachments(JSON.stringify(this.getEvents(lastFullBackup?.eventId)), timestamp),
+      });
       return this.upsertSnap("partial", 1, newestEventId);
     }
   }

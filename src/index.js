@@ -1,8 +1,7 @@
 import { getAuthGoogleUser } from "./googleAuth.js";
 export { EventsSnaps } from "./EventSnapsDO.js";
 
-const getDo = (clazz, name, env) => env[clazz].get(env[clazz].idFromName(name));
-const DB = env => getDo("EVENTS_SNAPS", "foo", env);
+const DB = env => env["EVENTS_SNAPS"].get(env["EVENTS_SNAPS"].idFromName("foo"));
 
 const UNSECURE_SAME_SITE_PATHS = {
 	"GET /api/events": async function (req, env, ctx) {
@@ -153,7 +152,8 @@ function parseSettings(env) {
 				time: Number(env.BACKUP_PARTIALTIME) * 24 * 3600000,
 				events: env.BACKUP_PARTIALEVENTS,
 			},
-			emails: env.BACKUP_EMAILS.split(";")
+			to: env.BACKUP_EMAILS.split(";").map(email => ({ email })), //todo rename BACKUP_EMAILS to BACKUP_EMAIL_TO??
+			from: { email: "noreply@your-domain.com", name: "CMS Backup Service" }, //env.BACKUP_EMAIL_FROM??
 		},
 		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
 		google: {
