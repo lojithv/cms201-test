@@ -1,13 +1,15 @@
 /* https://developers.cloudflare.com/workers/wrangler/configuration/ */
 {
 	/*"$schema": "node_modules/wrangler/config-schema.json", unnecessary*/
-	"name": "cms101",
+	"name": "cms201",
 	"main": "src/index.js",
 	"compatibility_date": "2025-04-23",
 	"assets": {
 		"binding": "ASSETS",
 		"directory": "./public",
-		"run_worker_first": ["/admin/*"]
+		"run_worker_first": [
+			"/admin/*"
+		]
 	},
 	"durable_objects": {
 		"bindings": [
@@ -19,7 +21,7 @@
 	},
 	"send_email": [
 		{
-			"name" : "SEND_EMAIL"
+			"name": "SEND_EMAIL"
 		}
 	],
 	"migrations": [

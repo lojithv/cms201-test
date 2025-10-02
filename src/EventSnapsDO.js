@@ -74,6 +74,17 @@ export class EventsSnaps extends DurableObject {
         timestamp INTEGER DEFAULT (strftime('%s','now'))
       );
     `);
+    //this is an async thread, and the worker completes before this finishes.
+    //we can wait for this to complete, but it might not be the best way to do it.
+
+    // /api/addall can be used as an interface 
+    // if (this.sql.exec(`SELECT COUNT(*) as count FROM events`).next().value.count === 0) {
+    //   this.initializer (async () => {
+    //     const startData = await env.ASSETS.fetch("staticData.json");
+    //     const startEvents = await startData.json();
+    //     this.build(startEvents);
+    //   })();
+    // }
   }
 
   #aes;
@@ -159,7 +170,7 @@ export class EventsSnaps extends DurableObject {
     const aes = await this.getAes();
     const encrypted = await aes.encryptAsJSON(data);
     const link = host + "/api/confirmRollback?id=" + encodeURIComponent(encrypted);
-    const body = `please review this backup, click this link to continue to rollback: <a href="${link}">${link}</a>`;
+    const body = `You MUST check that the zip file is ok and shows you a list of json data, before you click this link to continue to rollback: <a href="${link}">${link}</a>`;
     const data2 = JSON.stringify(this.getEvents());
     await this.emailBinding.send(
       await EmailMessageWithZipAttachment("rollback confirmation", domain, from, to, data2, body));
@@ -210,14 +221,18 @@ export class EventsSnaps extends DurableObject {
     }
   }
 
+  addAll(events) {
+    for (const { timestamp, email, json } of events)
+      this.sql.exec(
+        `INSERT INTO events (timestamp,email,json) VALUES (?,?,?,?)`,
+        timestamp, email, JSON.stringify(json)
+      );
+    this.updateSnap();
+  }
+
   rebuild(events) {
     this.sql.exec(`DELETE FROM snaps`);
     this.sql.exec(`DELETE FROM events`);
-    for (const { id, timestamp, email, json } of events)
-      this.sql.exec(
-        `INSERT INTO events (id,timestamp,email,json) VALUES (?,?,?,?)`,
-        id, timestamp, email, JSON.stringify(json)
-      );
-    this.updateSnap();
+    this.addAll(events);
   }
 }
