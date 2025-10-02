@@ -17,6 +17,11 @@
 			}
 		]
 	},
+	"send_email": [
+		{
+			"name" : "SEND_EMAIL"
+		}
+	],
 	"migrations": [
 		{
 			"new_sqlite_classes": [

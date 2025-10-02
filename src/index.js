@@ -142,7 +142,7 @@ function getEndpoint(req, PATHS) {
 
 function parseSettings(env) {
 	return {
-		resend: env.RESEND,
+		// resend: env.RESEND,
 		domain: env.DOMAIN,
 		backup: {
 			full: {
