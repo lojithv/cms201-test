@@ -16,9 +16,9 @@ function timestamp() {
   return new Date().toISOString().replaceAll(/[:-]/g, "").replaceAll("T", "_").slice(2, 13);
 }
 
-async function makeAttachments(content, timestamp = timestamp()) {
+async function makeAttachments(content, time = timestamp()) {
   return [{
-    filename: `backup_domain_${timestamp}.json.gz`,
+    filename: `backup_domain_${time}.json.gz`,
     content: await strToZipBase64(content)
   }];
 }
@@ -130,12 +130,12 @@ export class EventsSnaps extends DurableObject {
     const aes = await this.getAes();
     const encrypted = await aes.encryptAsJSON(data);
     const link = host + "/api/confirmRollback?id=" + encodeURIComponent(encrypted);
-    const timestamp = timestamp();
+    const time = timestamp();
     await this.emailBinding.send({
       to, from,
-      subject: `rollback confirmation ${domain} at ${timestamp}`,
+      subject: `rollback confirmation ${domain} at ${time}`,
       html: `please review this backup, click this link to continue to rollback: <a href="${link}">${link}</a>`,
-      attachments: makeAttachments(JSON.stringify(this.getEvents()), timestamp),
+      attachments: makeAttachments(JSON.stringify(this.getEvents()), time),
     });
     this.upsertSnap("full", 1, lastId);
   }
@@ -154,12 +154,12 @@ export class EventsSnaps extends DurableObject {
     const aes = await this.getAes();
     const decrypt = await aes.decryptAsJSON(string);
     const rollbackSnap = checkIfValid(decrypt, this.getSnap("rollback")?.value);
-    const timestamp = timestamp();
+    const time = timestamp();
     await this.emailBinding.send({
       to, from,
-      subject: `rollback backup ${domain} at ${timestamp}`,
+      subject: `rollback backup ${domain} at ${time}`,
       html: "",
-      attachments: makeAttachments(JSON.stringify(this.getEvents(rollbackSnap.lastId)), timestamp)
+      attachments: makeAttachments(JSON.stringify(this.getEvents(rollbackSnap.lastId)), time)
     });
     this.rebuild([...rollbackSnap.newEvents, ...addedEvents]);
   }
@@ -171,13 +171,13 @@ export class EventsSnaps extends DurableObject {
     const fullDuration = Date.now() - (lastFullBackup?.timestamp ?? 0);
     const unsafeEventCount = newestEventId - (lastFullBackup?.eventId ?? 0);
 
-    const timestamp = timestamp();
+    const time = timestamp();
     const html = "";
     if (fullDuration > full.time || unsafeEventCount > full.events) {
       await this.emailBinding.send({
         to, from, html,
-        subject: `full ${subject} backup ${domain} at ${timestamp}`,
-        attachments: await makeAttachments(JSON.stringify(this.getEvents()), timestamp()),
+        subject: `full ${subject} backup ${domain} at ${time}`,
+        attachments: await makeAttachments(JSON.stringify(this.getEvents()), time()),
       });
       return this.upsertSnap("full", 1, newestEventId);
     }
@@ -187,8 +187,8 @@ export class EventsSnaps extends DurableObject {
     if (partialDuration > partial.time && unsafeEventCount > partial.events) {
       await this.emailBinding.send({
         to, from, html,
-        subject: `partial backup ${domain} at ${timestamp}`,
-        attachments: await makeAttachments(JSON.stringify(this.getEvents(lastFullBackup?.eventId)), timestamp),
+        subject: `partial backup ${domain} at ${time}`,
+        attachments: await makeAttachments(JSON.stringify(this.getEvents(lastFullBackup?.eventId)), time),
       });
       return this.upsertSnap("partial", 1, newestEventId);
     }
