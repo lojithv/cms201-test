@@ -141,7 +141,6 @@ function getEndpoint(req, PATHS) {
 
 function parseSettings(env) {
 	return {
-		// resend: env.RESEND,
 		domain: env.DOMAIN,
 		backup: {
 			full: {
@@ -152,8 +151,8 @@ function parseSettings(env) {
 				time: Number(env.BACKUP_PARTIALTIME) * 24 * 3600000,
 				events: env.BACKUP_PARTIALEVENTS,
 			},
-			to: env.BACKUP_EMAIL_TO.split(";").map(email => ({ email })),
-			from: { email: env.BACKUP_EMAIL_FROM, name: "Auto Backup Service" },
+			to: env.BACKUP_EMAIL_TO,
+			from: env.BACKUP_EMAIL_FROM,
 		},
 		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
 		google: {

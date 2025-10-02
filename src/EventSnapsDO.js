@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { EmailMessage } from "cloudflare:email";
 import { AesGcmHelper } from "./AesGcmHelper.js";
 
 /*EMAIL*/
@@ -16,14 +17,42 @@ function timestamp() {
   return new Date().toISOString().replaceAll(/[:-]/g, "").replaceAll("T", "_").slice(2, 13);
 }
 
-async function makeAttachments(content, time = timestamp()) {
-  return [{
-    filename: `backup_domain_${time}.json.gz`,
-    content: await strToZipBase64(content)
-  }];
+async function EmailMessageWithZipAttachment(msg, domain, from, to, contentToBeZipped, body) {
+  const signature = domain + "_" + timestamp();
+  const subject = msg + ` backup (${signature})`;
+  const zipFileName = msg.replaceAll(/[^a-z0-9_]/ig, "_") + `_backup_${signature}.json.gz`;
+  contentToBeZipped = await strToZipBase64(contentToBeZipped);
+  let random = Math.random().toString(36).substring(2);
+  let boundary;
+  while (contentToBeZipped.includes(boundary = "----=_Part_" + random))
+    random = Math.random().toString(36).substring(2);
+
+  const raw = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `Message-ID: <${Date.now()}.${random}@${domain}>`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/plain; charset="UTF-8"`,
+    `Content-Transfer-Encoding: 7bit`,
+    ``,
+    body ?? subject,
+    ``,
+    `--${boundary}`,
+    `Content-Type: application/gzip; name="${zipFileName}"`,
+    `Content-Transfer-Encoding: base64`,
+    `Content-Disposition: attachment; filename="${zipFileName}"`,
+    ``,
+    contentToBeZipped,
+    `--${boundary}--`,
+    ``
+  ].join("\r\n");
+  return await new EmailMessage(from, to, raw);
 }
 /*EMAIL END*/
-
 
 export class EventsSnaps extends DurableObject {
 
@@ -130,13 +159,10 @@ export class EventsSnaps extends DurableObject {
     const aes = await this.getAes();
     const encrypted = await aes.encryptAsJSON(data);
     const link = host + "/api/confirmRollback?id=" + encodeURIComponent(encrypted);
-    const time = timestamp();
-    await this.emailBinding.send({
-      to, from,
-      subject: `rollback confirmation ${domain} at ${time}`,
-      html: `please review this backup, click this link to continue to rollback: <a href="${link}">${link}</a>`,
-      attachments: makeAttachments(JSON.stringify(this.getEvents()), time),
-    });
+    const body = `please review this backup, click this link to continue to rollback: <a href="${link}">${link}</a>`;
+    const data2 = JSON.stringify(this.getEvents());
+    await this.emailBinding.send(
+      await EmailMessageWithZipAttachment("rollback confirmation", domain, from, to, data2, body));
     this.upsertSnap("full", 1, lastId);
   }
 
@@ -154,13 +180,9 @@ export class EventsSnaps extends DurableObject {
     const aes = await this.getAes();
     const decrypt = await aes.decryptAsJSON(string);
     const rollbackSnap = checkIfValid(decrypt, this.getSnap("rollback")?.value);
-    const time = timestamp();
-    await this.emailBinding.send({
-      to, from,
-      subject: `rollback backup ${domain} at ${time}`,
-      html: "",
-      attachments: makeAttachments(JSON.stringify(this.getEvents(rollbackSnap.lastId)), time)
-    });
+    const data = JSON.stringify(this.getEvents(rollbackSnap.lastId));
+    await this.emailBinding.send(
+      await EmailMessageWithZipAttachment("rollback", domain, from, to, data));
     this.rebuild([...rollbackSnap.newEvents, ...addedEvents]);
   }
 
@@ -171,25 +193,19 @@ export class EventsSnaps extends DurableObject {
     const fullDuration = Date.now() - (lastFullBackup?.timestamp ?? 0);
     const unsafeEventCount = newestEventId - (lastFullBackup?.eventId ?? 0);
 
-    const time = timestamp();
-    const html = "";
     if (fullDuration > full.time || unsafeEventCount > full.events) {
-      await this.emailBinding.send({
-        to, from, html,
-        subject: `full ${subject} backup ${domain} at ${time}`,
-        attachments: await makeAttachments(JSON.stringify(this.getEvents()), time()),
-      });
+      const data = JSON.stringify(this.getEvents());
+      await this.emailBinding.send(
+        await EmailMessageWithZipAttachment("full", domain, from, to, data));
       return this.upsertSnap("full", 1, newestEventId);
     }
 
     const lastPartialBackup = this.getSnap("partial");
     const partialDuration = Date.now() - (lastPartialBackup?.timestamp ?? 0);
     if (partialDuration > partial.time && unsafeEventCount > partial.events) {
-      await this.emailBinding.send({
-        to, from, html,
-        subject: `partial backup ${domain} at ${time}`,
-        attachments: await makeAttachments(JSON.stringify(this.getEvents(lastFullBackup?.eventId)), time),
-      });
+      const data = JSON.stringify(this.getEvents(lastFullBackup?.eventId));
+      await this.emailBinding.send(
+        await EmailMessageWithZipAttachment("partial", domain, from, to, data));
       return this.upsertSnap("partial", 1, newestEventId);
     }
   }
