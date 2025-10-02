@@ -1,2 +1,3 @@
 # cms201
-jsonrelations!
+
+`npx wrangler dev` to run locally!

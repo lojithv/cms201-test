@@ -1,12 +1,15 @@
 import { DurableObject } from "cloudflare:workers";
-import { ResendEmail } from "./resendEmail.js";
+// import { ResendEmail } from "./resendEmail.js";
+import { CloudFlareEmail } from "./cloudFlareEmail.js";
 import { AesGcmHelper } from "./AesGcmHelper.js";
+
 
 export class EventsSnaps extends DurableObject {
 
   constructor(ctx, env) {
     super(ctx, env);
-    this.resend = new ResendEmail(env.RESEND);
+    // this.resend = new ResendEmail(env.RESEND);
+    this.email = new CloudFlareEmail(env.SEND_EMAIL); // use cloudflare
     this.sql = this.ctx.storage.sql;
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS events (
@@ -40,8 +43,7 @@ export class EventsSnaps extends DurableObject {
     return this.sql.exec("SELECT * FROM events ORDER BY id DESC LIMIT 1").next().value?.id;
   }
 
-  getSnap(name) {
-    name ||= "all"
+  getSnap(name = "all") {
     const res = this.sql.exec(`SELECT * FROM snaps WHERE name = ?`, name).next().value;
     if (res) res.value = JSON.parse(res.value);
     return res;
@@ -108,7 +110,8 @@ export class EventsSnaps extends DurableObject {
     const aes = await this.getAes();
     const encrypted = await aes.encryptAsJSON(data);
     const link = host + "/api/confirmRollback?id=" + encodeURIComponent(encrypted);
-    await this.resend.confirmRollbackEmail(domain, emails, link, JSON.stringify(this.getEvents()));
+    // await this.resend.confirmRollbackEmail(domain, emails, link, JSON.stringify(this.getEvents()));
+    await this.email.confirmRollbackEmail(domain, emails, link, JSON.stringify(this.getEvents()));
     this.upsertSnap("full", 1, lastId);
   }
 
@@ -127,7 +130,8 @@ export class EventsSnaps extends DurableObject {
     const decrypt = await aes.decryptAsJSON(string);
     const rollbackSnap = checkIfValid(decrypt, this.getSnap("rollback")?.value);
     const addedEvents = this.getEvents(rollbackSnap.lastId);
-    await this.resend.backupEmail(domain, emails, JSON.stringify(addedEvents), "rollback");
+    // await this.resend.backupEmail(domain, emails, JSON.stringify(addedEvents), "rollback");
+    await this.email.backupEmail(domain, emails, JSON.stringify(addedEvents), "rollback");
     this.rebuild([...rollbackSnap.newEvents, ...addedEvents]);
   }
 
@@ -139,14 +143,16 @@ export class EventsSnaps extends DurableObject {
     const unsafeEventCount = newestEventId - (lastFullBackup?.eventId ?? 0);
 
     if (fullDuration > full.time || unsafeEventCount > full.events) {
-      await this.resend.backupEmail(domain, emails, JSON.stringify(this.getEvents()), "full");
+      // await this.resend.backupEmail(domain, emails, JSON.stringify(this.getEvents()), "full");
+      await this.email.backupEmail(domain, emails, JSON.stringify(this.getEvents()), "full");
       return this.upsertSnap("full", 1, newestEventId);
     }
 
     const lastPartialBackup = this.getSnap("partial");
     const partialDuration = Date.now() - (lastPartialBackup?.timestamp ?? 0);
     if (partialDuration > partial.time && unsafeEventCount > partial.events) {
-      await this.resend.backupEmail(domain, emails, JSON.stringify(this.getEvents(lastFullBackup?.eventId)), "partial");
+      // await this.resend.backupEmail(domain, emails, JSON.stringify(this.getEvents(lastFullBackup?.eventId)), "partial");
+      await this.email.backupEmail(domain, emails, JSON.stringify(this.getEvents(lastFullBackup?.eventId)), "partial");
       return this.upsertSnap("partial", 1, newestEventId);
     }
   }

@@ -4,7 +4,7 @@ export { EventsSnaps } from "./EventSnapsDO.js";
 const getDo = (clazz, name, env) => env[clazz].get(env[clazz].idFromName(name));
 const DB = env => getDo("EVENTS_SNAPS", "foo", env);
 
-const PATHS = {
+const UNSECURE_SAME_SITE_PATHS = {
 	"GET /api/events": async function (req, env, ctx) {
 		return await DB(env).getEvents();
 	},
@@ -12,14 +12,14 @@ const PATHS = {
 		const name = req.url.searchParams.get("name");
 		return await DB(env).getSnap(name);
 	},
-	"GET /api/uploaded-images": async function(req, env, ctx) {
+	"GET /api/uploaded-images": async function (req, env, ctx) {
 		const { image_server: { account_id, api_token } } = env.settings;
 		// required paginating to retrieve all images in cloudfare images (100 imgs/page default)
 		let page = 1;
 		let imgURLs = [];
 		while (true) {
 			const url = `https://api.cloudflare.com/client/v4/accounts/${account_id}/images/v1?page=${page}`;
-			const response = await fetch(url, {headers: { "Authorization": `Bearer ${api_token}` }});
+			const response = await fetch(url, { headers: { "Authorization": `Bearer ${api_token}` } });
 			if (!response.ok)
 				break;
 			const { images } = (await response.json()).result;
@@ -33,9 +33,15 @@ const PATHS = {
 		}
 		return imgURLs;
 	},
+};
+
+const UNSECURE_PATHS = {
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
-		const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+		const state = req.url.pathname == "/auth/login" ? "/" :
+			req.url.pathname;
+
+		return Response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?` +
 			new URLSearchParams({
 				client_id,
 				redirect_uri,
@@ -43,20 +49,21 @@ const PATHS = {
 				scope: "openid email profile",
 				access_type: "online",
 				prompt: "consent",
-			});
-		return Response.redirect(oauthUrl, 302);
+				state,
+			}), 302);
 	},
 	"GET /auth/logout": function (req, env, ctx) {
-		return new Response("ok. Logged out.", {
-			status: 200,
-			headers: {
-				"Set-Cookie": `session_token=; HttpOnly; Secure; Path=/; Max-Age=0; SameSite=Lax`,
+		return new Response(null, {
+			status: 302, headers: {
 				"Location": "/",
-			},
+				"Set-Cookie": `session_token=; HttpOnly; Secure; Path=/; Max-Age=0; SameSite=Lax`,
+			}
 		});
 	},
 	"GET /auth/callback": async function (req, env, ctx) {
 		const code = req.url.searchParams.get("code");
+		const state = req.url.searchParams.get("state") || "/";
+
 		const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -69,17 +76,20 @@ const PATHS = {
 		if (!tokenRes.ok)
 			return new Response(`Authentication Failed!`, { status: 401 });
 		const tokenData = await tokenRes.json();
-		return new Response("ok. Authentication success!", {
-			status: 200,
-			headers: {
+		//todo doesn't the tokenData contain the state too? should we not read it from there?
+		return new Response(null, {
+			status: 302, headers: {
+				"Location": state,
 				"Set-Cookie": `session_token=${tokenData.id_token}; HttpOnly; Secure; Path=/; Max-Age=7200; SameSite=Lax`,
-				"Content-Type": "text/html",
-			},
+			}
 		});
 	}
 };
 
 const SECURE_PATHS = {
+	"GET /admin/": function (req, env, ctx, user) {
+		return env.ASSETS.fetch(req);
+	},
 	"POST /api/event": async function (req, env, ctx, user) {
 		const json = await req.json();
 		return await DB(env).addEvent(user, json);
@@ -132,7 +142,7 @@ function getEndpoint(req, PATHS) {
 
 function parseSettings(env) {
 	return {
-		resend: env.RESEND,
+		// resend: env.RESEND,
 		domain: env.DOMAIN,
 		backup: {
 			full: {
@@ -169,7 +179,12 @@ async function onFetch(request, env, ctx) {
 	try {
 		env.settings ??= parseSettings(env);
 		Object.defineProperty(request, "url", { value: new URL(request.url) });
-		let endPoint = getEndpoint(request, PATHS);
+		let endPoint = getEndpoint(request, UNSECURE_PATHS);
+		if (!endPoint) {  //validate that checking CORS manually for api endpoints like this is ok
+			endPoint = getEndpoint(request, UNSECURE_SAME_SITE_PATHS);
+			if (endPoint && !request.headers.get("Referer")?.startsWith(request.url.origin))
+				throw "CORS error: Referer not same site";
+		}									//validate end
 		let user;
 		if (!endPoint) {
 			endPoint = getEndpoint(request, SECURE_PATHS);
@@ -179,19 +194,21 @@ async function onFetch(request, env, ctx) {
 					payload = await payload;
 				user = payload?.email;
 				if (!user)
-					endPoint = PATHS["GET /auth/login"]; //?redirect=" + encodeURIComponent(request.url)
+					endPoint = UNSECURE_PATHS["GET /auth/login"];
 			}
 		}
+		if (!endPoint)
+			throw "no endPoint found";
+
 		let res = endPoint(request, env, ctx, user);
 		if (res instanceof Promise)
 			res = await res;
 		return res instanceof Response ? res :
 			(typeof res === "string") ? new Response(res) :
-				new Response(JSON.stringify(res), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", } });
+				new Response(JSON.stringify(res), { status: 500, headers: { "Content-Type": "application/json", } });
 	} catch (error) {
-		console.log(error, request.url);
-		// we can store the errors in the durable object?
-		return new Response(`Error. ${Date.now()}.`, { status: 500 });
+		console.log(error, request.url); // we can store the errors in the durable object?
+		return new Response(`Error. ${Date.now()}.`, { status: 500 });//or, redirect to frontPage always??
 	}
 }
 

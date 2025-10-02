@@ -6,7 +6,8 @@
 	"compatibility_date": "2025-04-23",
 	"assets": {
 		"binding": "ASSETS",
-		"directory": "./public"
+		"directory": "./public",
+		"run_worker_first": ["/admin/*"]
 	},
 	"durable_objects": {
 		"bindings": [
@@ -16,6 +17,11 @@
 			}
 		]
 	},
+	"send_email": [
+		{
+			"name" : "SEND_EMAIL"
+		}
+	],
 	"migrations": [
 		{
 			"new_sqlite_classes": [

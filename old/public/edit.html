@@ -21,7 +21,12 @@
         const input = document.querySelector(`input[name="${key}"]`);
         input.value = JSON.stringify(references);
         const container = document.querySelector(`#${key}`);
-        container.innerHTML = references.map(reference => `<li>${reference}</li>`).join("\n");
+        container.innerHTML = "";
+        references.forEach(ref => {
+          const li = document.createElement("li");
+          li.textContent = ref;
+          container.appendChild(li);
+        });
       }
     })
   </script>

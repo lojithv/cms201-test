@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Hello, World!</title>
+</head>
+
+<body>
+	<ul>
+		<li><a href="/auth/login">Log in</a></li>
+		<li><a href="/auth/logout">Log out</a></li>
+	</ul>
+
+	<pre>here comes the content of the durable object</pre>
+	<div style="position: fixed; top:0; right:0; z-index: -1;">
+		<h3>List all posts:</h3>
+		<pre id="list"></pre>
+	</div>
+
+	<button href="/api/events">get all events</button>
+
+	<h3>Result:</h3>
+	<pre id="result"></pre>
+
+	<h3>add a post:</h3>
+	<form id="addPost">
+		<label for="title">title</label>
+		<input type="text" id="title" name="title" required />
+		<br>
+		<label for="content">content</label>
+		<textarea id="content" name="content"></textarea>
+		<br>
+		<label for="tags">tags</label>
+		<input type="text" id="tags" name="tags" />
+		<br>
+		<label for="published">published</label>
+		<input type="checkbox" id="published" name="published" />
+		<br>
+		<button type="submit"> Create Post </button>
+	</form>
+
+	<h3>post image:</h3>
+	<form id="addImage">
+		<input type="file" name="image" accept="image/png, image/gif, image/jpeg, image/webp, image/svg+xml" />
+		<img width="100" id="preview" src="" />
+		<input type="hidden" name="imageHash" id="imageHash" />
+		Image Exits: <input type="checkbox" name='imageExists' disabled />
+		<button type="submit" disabled>Upload Image</button>
+	</form>
+
+	<h3>Rollback:</h3>
+	<form id="requestRollback" action="/api/requestRollback" method="POST">
+		<input type="file" name="file" accept=".json" />
+		<button type="submit">Rollback</button>
+	</form>
+
+	<script>
+		async function imageHashBase64URL(arrayBuffer) {
+			const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
+			const base64 = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+			return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+		};
+
+		async function fetch200(url, options) {
+			const response = await fetch(url, options);
+			if (response.ok)
+				return response;
+			throw new Error(response.status + ": " + response.statusText);
+		}
+
+		function ok(target, message) {
+			target.dispatchEvent(Object.assign(new Event("ok", { bubbles: true }), { message }));
+		}
+
+		async function updateImageForm(blob) {
+			const arrayBuffer = await blob.arrayBuffer();
+			const fileSrc = URL.createObjectURL(blob);
+			document.querySelector("#preview").src = fileSrc;
+			document.querySelector("#addImage button[type='submit']").setAttribute("disabled", true);
+			let hash = await imageHashBase64URL(arrayBuffer);
+			document.querySelector("#imageHash").value = hash;
+			let exists = false;
+			try {
+				exists = (await fetch(`https://imagedelivery.net/Ckr7BDu4VxTAuei58W1b7Q/${hash}/public`, { method: 'HEAD' })).ok;
+			} catch (e) { }
+			document.querySelector("#addImage input[name='imageExists']").checked = exists;
+			document.querySelector("#addImage button[type='submit']").toggleAttribute("disabled", exists);
+			ok(this, "Image Checked");
+		}
+
+		async function waitForOkError(href, timeout = 30000) {
+			timeout += Date.now();
+			const tab = window.open(href, '_blank');
+			while (Date.now() < timeout) {
+				try {
+					if (
+						tab.location.origin === window.location.origin &&
+						tab.document?.body?.textContent?.match(/^(ok|error)\./)
+					) {
+						break;
+					}
+				} catch (e) { }
+				await new Promise(r => setTimeout(r, 500));
+			}
+			if (Date.now() >= timeout)
+				throw new Error("Error: Timed out waiting for tab to load expected content");
+			ok(this, tab.document.body.textContent);
+			tab.close();
+		}
+
+		async function addPost(json) {
+			const uid = Math.floor(Math.random() * 100000000); //todo do this in the worker?
+			const result = await fetch200('api/event/', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ uid, ...json }),
+			});
+			ok(this, JSON.stringify(await result.json()));
+		}
+
+		const list = document.getElementById('list');
+		const result = document.getElementById('result');
+
+		let jsonList;
+
+		(async function () {
+			const resp = await fetch('/api/snap?name=all');
+			jsonList = await resp.json();
+			list.textContent = JSON.stringify(jsonList, null, 2);
+			ok(document.body, "init ok.");
+		})();
+
+		for (const el of document.querySelectorAll("a[wait-for-success]"))
+			el.addEventListener('click', async function (e) {
+				e.preventDefault();
+				if (this.hasAttribute("waiting"))
+					return alert("already trying to " + this.innerText.toLowerCase());
+				this.setAttribute("waiting", "true");
+				await waitForOkError(this.href);
+				this.removeAttribute("waiting");
+			});
+
+
+		document.querySelector("input[name='file']").addEventListener('change', _ => result.textContent = "ok. file added");
+		document.querySelector("input[name='image']").addEventListener('change', function () { updateImageForm(this.files[0]); });
+
+		document.querySelector("#requestRollback").addEventListener("submit", async function (e) {
+			e.preventDefault();
+			const file = this.children[0].files[0];
+			if (!file)
+				return alert("Please select a file."), this.children[0].click();
+			const resp = await fetch200(this.action, {
+				method: this.method,
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(JSON.parse(await file.text()))
+			});
+			ok(this, await resp.text());
+		});
+
+		document.querySelector("#addPost").addEventListener("submit", async function (e) {
+			e.preventDefault();
+			await addPost(Object.fromEntries(new FormData(this)));
+		});
+
+		document.querySelector("#addImage").addEventListener("submit", async function (e) {
+			e.preventDefault();
+			const formData = new FormData(this);
+			const uploadURL = await (await fetch200(`/api/uploadImageURL?path=${formData.get("imageHash")}?toDelete=true`)).text();
+			const uploadForm = new FormData();
+			uploadForm.append("file", formData.get("image"));
+			await fetch200(uploadURL, { method: "POST", body: uploadForm });
+			ok(this, 'Image Added to Image Server')
+		});
+
+		document.querySelector("button[href='/api/events']").addEventListener("click", async function (e) {
+			e.preventDefault();
+			const resp = await fetch(this.getAttribute("href"));
+			if (!resp.ok)
+				return emit('error', "Error: " + resp.statusText);
+			const data = await resp.json();
+			result.textContent = JSON.stringify(data, null, 2);
+		});
+
+		window.addEventListener("error", e => result.textContent = `error. ${e.error.message}`);
+		window.addEventListener("unhandledrejection", e => result.textContent = `error. ${e.reason}`);
+		window.addEventListener("ok", e => result.textContent = `ok. ${e.message}`);	
+	</script>
+</body>
+
+</html>
