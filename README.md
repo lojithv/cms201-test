@@ -137,3 +137,12 @@ Purpose: make sure that the worker data is backed up.
 
 * if at any time the workflow fails, then just return. This will make the worker just try to upgrade events and its snap state the next day.
 * send an ***ERROR*** email to the gmail account.
+
+## todo
+
+0. We have a key problem. We must use timestamp.id as the key number I think. And then we must make sure that when we upgrade, the last event we add is not the same timestamp as is now currently.
+1. worker functions for `/admin/backup`
+2. worker function for `/api/data/xyz` => then read and reload the corresponding `/data/xyz` from github. Cache forever.
+2. .yml file for cron job on github.
+3. convert the .yml file into a single reaction from worker workflow dispatch.
+4. set up history.html view. Just get the pages from `/data/pages.json`, and then load the snaps and events as needed.
