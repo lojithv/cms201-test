@@ -26,14 +26,30 @@
 1. Create a cloudflare project with the name of the project.
 
 **4. cloudflare + github (manual)**
-1. Create a github pat token for the project, with
+1. Connect the cloudflare project to the github repo.
+    1. Go to the dash.cloudflare.com
+    2. Go to "Compute" > "Workers & Pages" > "Create application" > under "Workers" click "import a repository"
+    3. Connect your github account, and authorize cloudflare to access your github account.
+
+2. Create a github pat token for the project, with
 `content:write` and `meta:read` permissions.
+    1. Go to github.com/settings/tokens
+    2. Click "Fine-grained tokens" > "Generate new token"
+    4. Select project repository.
+    5. Select permissions `content:write` and `meta:read`
+    6. Select no expiration
+    7. Click "Generate token"
+    8. Copy the token
 => github PAT
 
-2. Connect the cloudflare project to the github repo.
-
-3. Add the github pat token to the cloudflare project secrets as `GITHUB_PAT`.
-
+3. Save githubPAT token to the cloudflare project as a runtime environment variable `GITHUB_PAT`. 
+    1. Go to dash.cloudflare.com
+    2. Go to "Compute" > "Workers & Pages" > select your project > "Settings" > "Environment Variables"
+    3. Click "Add variable"
+    4. Name: `GITHUB_PAT`
+    5. Type: `Secret`
+    6. Value: `<your-github-pat-token>`
+    7. Click "Save"
 
 **4. copy files (cli script)**
 0. make a `README.md` and `wrangler.jsonc` file with the content of this file.
