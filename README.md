@@ -63,7 +63,6 @@ Below is a receipe for how to replicate this project from scratch. It involves a
 * Have the following files in the repo:
     * `.github/workflows/`
         * `worker-events.yml`
-        * `make-snaps.yml`
     * `wrangler.jsonc`
     * `.gitignore`
     * `README.md`
