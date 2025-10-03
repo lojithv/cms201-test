@@ -141,17 +141,18 @@ function Object.assignAssign(...objs) {
 
 Purpose: make sure that the worker data is backed up.
     1. if there is only one event, that means that no changes have been made, just return.
-    2. else, keep a variable with the snap. keep a variable with the event number.
-    3. try to push the events between 2 and last event to github.
-    4. if this returns ok, then wait for 1min, and then try to get the latest `/data/snap.json`.
-    5. if this `/data/snap.json` is exactly the same as the snap saved in memory, then get any events added since last and then rebuild the events table with [snap, ...eventsSinceSaved].
+    2. else, keep `varSnap` = snapshot of the state; and `varKey` = the event id with the last event added with a timestamp that is not now. Make sure that new Date().getTime() != last.timestamp.
+    3. Try to push the events between 2 and last event to github. This can take a looong time.
+    4. If this returns ok, then the body of the response should be the new `/data/snap.json` file.
+    5. If this `/data/snap.json` is exactly the same as the snap saved in memory, things is ok, then we change the first snap by system user and delete the snaps from the sqllite database that has the key lower than `varKey`.
+    6. make sure that the worker `ctx.waitUntil()` the fetch promise.
 
 * if at any time the workflow fails, then just return. This will make the worker just try to upgrade events and its snap state the next day.
 * send an ***ERROR*** email to the gmail account.
 
 ## todo
 
-1. We have a key problem. We must use timestamp.id as the key number I think. And then we must make sure that when we upgrade, the last event we add is not the same timestamp as is now currently.
+1. We have a key problem. We must use timestamp.id as the key number I think.
 2. worker functions for `/admin/backup` => make a json events file and send it as a workflow dispatch to github.
 3. worker function for `/api/data/xyz` => then read and reload the corresponding `/data/xyz` from github. Cache forever.
 4. make the .yml file for cron job on github. Here, we need to add some security meassures, the llm is good at adding this.
