@@ -63,6 +63,9 @@
 1. `.github/workflows/worker-events.yml`. Receives input from the worker.
 Purpose: store information about the changes of the app, and who made them. Write events_x_y.json files to the `/data/events/*` folder in the main branch.
     1. ensure that it parses as json.
+    2. returns a 200 if ok.
+
+    * if workflow fails: no input has been added.
 
 2. `.github/workflows/make-snaps.yml`. Listens for changes in `/data/events/*`.
 Purpose: make the app data more compact.
@@ -84,7 +87,8 @@ Purpose: make the app data more compact.
 * in sum: whenever the worker adds a new `/data/events/x_y.json` file, then:
     1. a new file will be added in the `<main>/data/events/` folder. This backs up the new events. This will leave a separate commit trace in the repo.
     2. the `<main>/data/events/` and `/data/snapWithNull/` folders are cleaned.
-    3. the  `<main>/data/snap.json` file is updated. 2&3 leaves a separate commit trace.
+    3. the  `<main>/data/snap.json` and `<main>/data/pages.json` file is updated. 
+    2&3 leaves a separate commit trace.
 
 * principles for worker:
     1. `/data/snap.json` is the most up-to-date version of the snap.
@@ -93,38 +97,12 @@ Purpose: make the app data more compact.
     4. new events can be pushed to `.github/workflows/worker-events.yml`.
 
 * examples of worker interaction:
-    1. Startup? fetch `/data/snap.json` and set as the primary `/data/snap.json`.
-    2. Recreate history? The worker is limited to 50mb of working memory. This means that big history *must* be recreated in the browser. This means that we would like to view history *only* within a specific time period. The history reading app will need to  only view  so we would need to add a `this.paused = true` in the DO, and then we need to check that this is not on for all `write` operations that the worker wants to do against the DO.
-    2. worker fetches `/api/some-endpoint` and gets 10 new events.
-
-
-For the changed file, make a new `/data/snapsWithNull/*` json file with the same name. Empty properties are kept as null. Creates new snapshotWithNull.json file.
-    1. merge the last two newest events_x_y.json files if they are less than 25mb in size.
-    2. else. we remake snapshotWithNull_x_y.json files for all the events_. We make a snap remake snapshot. if the resulting file is less than 25MB.
-3. Github actions then works, and updates the entire content of `/data/*`.
-4. iff worker needs it, then it will manually fetch the entire content of `/data/*`.
-the worker will do so using the github api to get the names of all the files in the `/data/` folder , and then fetch each file one by one.
-((I don't ))
-
-*
-1. In
-
-2. the `/public/data/*` folder contains all the data files the project needs.
-3. The github actions script is a cleanup script that 
-
-3. Whenever we retrieve more than 25files or 25mb of new events, then we create a new files in chunks of roughly 25mb. and 
-3. If there are more than 25MB of new events, then we create a new file `/public/data/events_startIndex_endIndex_startDate_endDate.json`.
-
-1. all longterm events are stored as `/data/events/event_startIndex_endIndex_startDate_endDate.json`. Whenever we try to add a set of events to the last entry in the db, and the new file is bigger than 25MB, then we instead create a new file with just the new events.
-2. The start is given by the first instance of the file. The end is given by the last end added. The new file name is created using the start of the first file, and the end of the last file.
-3. If the workflow fails, then multiple events*.json files will be left in the public folder. This is not a problem.
-
-
-
-This script will read all the files starting with `/public/data/event*.json` in the repo.
-
-2. First, it will find all the files matching `/data/events*.json` and less than 25MB in size.
-3. Then it will sort them alphabetically, then trim them, and then remove `/^\s*\[/`,`/\]\s*$/`, join their remaining content, wrap them in `[...]`, and save them.
-4. Then we need to run a script that creates a new full.json snapshot using an Object.assignAssign() of all the events in the db, fifo.
-5. Then it will commit the new snapshot to the `data-feedback` branch.
-
+    1. Startup? fetch `/data/snap.json` and set its content as `snap` the first entry in the DO. User is system. id and timestamp is default. Then DO's `this.active = true`.
+    2. Recreate history? The worker is limited to 50mb of working memory. So history must be viewed in pages in the browser.
+        1. Load list of pages from `/data/pages.json`.
+        2. The x and y are timestamps. Find the `x_y` for that time.
+        3. Load all *older* `/data/snapWithNull/x_y.json` files than x_y.
+        4. merge them using Object.assignAssignWithNull into a `snap` json object.
+        5. Then load all the `/data/events/x_y.json` and add them as events.
+        6. You are ready to timetravel.
+        7. Likely use case is *cherrypick* whole posts or single properties that you would like to "restore". Set them up as a new event, and push them to the worker `/api/add`. 
