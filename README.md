@@ -1,71 +1,82 @@
 # cms201
 
-`npx wrangler dev --port 3033` to run locally!
+ > `npx wrangler dev --port 3033`
 
-## how to stamp the project?
+Below is a receipe for how to replicate this project from scratch. It involves a mix of manual steps and scripts. The goal is to have a fully working Cloudflare Worker project that uses Google OAuth for authentication, GitHub for version control, and Cloudflare Pages for deployment. The project also includes a system for tracking changes and creating snapshots of data.
 
-**1. accounts google oauth client (manual)**
-1. Create a gmail account, github account, cloudflare account for the project. This must be done manually.
+
+## 1. Manual steps
+1. Create a **gmail account**, **github account**, **cloudflare account** for the project.
 => gmail and password
 => github username (and password?)
 => cloudflare username (and password?)
-
-2. Create a console.cloud.google.com project with the name of the project.
-
-3. Set up an oauth service. select the project, go to "APIs & Services" > "OAuth consent screen". Select "External", fill in the app name, user support email, developer contact email, and save. Then go to "Credentials" > "Create Credentials" > "OAuth Client ID". Select "Web application", give it a name, and add the following authorized redirect URIs:
-   - `https://<your-cloudflare-project-name>.workers.dev/auth/callback`
-   - `http://localhost:3033/api/auth/callback`
-   - `http://127.0.0.1:3033/api/auth/callback`
-   Replace `<your-cloudflare-project-name>` with the actual name of your Cloudflare project.
-
-
-**2. github (manual)**
-1. Create a github repo with the name of the project.
-
-**3. cloudflare (manual)**
-1. Create a cloudflare project with the name of the project.
-
-**4. cloudflare + github (manual)**
-1. Connect the cloudflare project to the github repo.
+=> `${projectname}` (no spaces, no special characters, only lowercase letters, numbers and hyphens). //todo should we use `_` instead of `-`??
+2. Create a github repo with the name of the project.
+3. Create a cloudflare project with the name of the project.
+4. Create a console.cloud.google.com project with the name of the project.
+5. Set up an oauth service. 
+    1. select the project, go to "APIs & Services" > "OAuth consent screen". 
+    2. Select "External", name: `"${projectname}$ oauth client"`, user support: `gmail`, developer contact: `gmail`, and save. 
+    3. Then go to "Credentials" > "Create Credentials" > "OAuth Client ID". 
+    4. Select "Web application", give it a name: `"${projectname} oauth client"`, and add the following authorized redirect URIs:
+        - `https://<projectname>.workers.dev/auth/callback`
+        - `http://localhost:3033/api/auth/callback`
+        - `http://127.0.0.1:3033/api/auth/callback`
+=> google auth client id 
+=> google auth secret
+6. Connect the cloudflare project to the github repo.
     1. Go to the dash.cloudflare.com
     2. Go to "Compute" > "Workers & Pages" > "Create application" > under "Workers" click "import a repository"
     3. Connect your github account, and authorize cloudflare to access your github account.
-
-2. Create a github workflow dispatch PAT token for the project.
+7. Create a github workflow dispatch PAT token.
     1. Go to github.com/settings/tokens
     2. Click "Fine-grained tokens" > "Generate new token"
-    4. Select project repository.
-    5. Select permissions `actions:write`, `contents:read` and `meta:read`
-    6. Select no expiration
+    3. Name: `${projectname}-worker-events`
+    4. Select project repository <projectname>. (!!!)
+    5. permissions: `actions:write`, `contents:read` and `meta:read`
+    6. Expiration: `No expiration`
     7. Click "Generate token"
     8. Copy the token
 => github PAT
-
-3. Save githubPAT token to the cloudflare project as a runtime environment variable `GITHUB_PAT`. 
+8. Update Cloudflare enviroment variables:
     1. Go to dash.cloudflare.com
     2. Go to "Compute" > "Workers & Pages" > select your project > "Settings" > "Environment Variables"
     3. Click "Add variable"
-    4. Name: `GITHUB_PAT`
-    5. Type: `Secret`
-    6. Value: `<your-github-pat-token>`
-    7. Click "Save"
+        * Name: `GITHUB_PAT`, `Secret`, => value: `github PAT`
+        * Name: `OAUTH_CLIENT_ID`, `Secret`, => value: `google auth client id`
+        * Name: `OAUTH_CLIENT_SECRET`, `Secret`, => value: `google auth secret`
+        * Name: `GMAIL`, `Secret`, => value: `gmail`
+        * Name: `PROJECT_NAME`, `Secret`, => value: `${projectname}`
+    4. Click "Save"
 
-**4. copy files (cli script)**
+## Copy files (cli script)
+
 0. make a `README.md` and `wrangler.jsonc` file with the content of this file.
 1. commit `README.md` and `wrangler.jsonc` plus `.gitignore`, `public/*`, `src/*`, `data/*` to the github repo.
-2. create a branch `data` from main.
-4. Wait for 1min.
-5. fetch `https://<your-cloudflare-project-name>.workers.dev/startup`. Make sure that it returns the same state as in the snapshot.json inside  make sure that it returns the same value as was in the `data` branch commit.
-4. This will setup the database with default data, and then send an email to the gmail account with info. It will then redirect to the admin page.
+2. Wait for 1min. 10sec?
+3. fetch `https://<projectname>.workers.dev/startup`. Make sure that it returns the same state as in the snapshot.json inside make sure that it returns the same value as was in the `data` branch commit.
 
-**5. github actions script**
+* Have the following files in the repo:
+    * `.github/workflows/`
+        * `worker-events.yml`
+        * `make-snaps.yml`
+    * `wrangler.jsonc`
+    * `.gitignore`
+    * `README.md`
+    * `public/*` (static files)
+    * `src/*` (worker code)
+    * `data/*` (data files)
+        * `snap.json` (current state snapshot)
+        * `pages.json` (list of event pages)
+        * `events/` (folder with event files)
+        * `snapWithNull/` (folder with snapshots matching event pages)
+
+## Github actions script
 
 1. `.github/workflows/worker-events.yml`. Receives input from the worker.
 Purpose: store information about the changes of the app, and who made them. Write events_x_y.json files to the `/data/events/*` folder in the main branch.
     1. ensure that it parses as json.
     2. returns a 200 if ok.
-
-    * if workflow fails: no input has been added.
 
 2. `.github/workflows/make-snaps.yml`. Listens for changes in `/data/events/*`.
 Purpose: make the app data more compact.
@@ -106,3 +117,12 @@ Purpose: make the app data more compact.
         5. Then load all the `/data/events/x_y.json` and add them as events.
         6. You are ready to timetravel.
         7. Likely use case is *cherrypick* whole posts or single properties that you would like to "restore". Set them up as a new event, and push them to the worker `/api/add`. 
+
+## worker chron jobs
+
+1. `/backup events`
+Purpose: make sure that  
+    * if workflow fails: no input has been added. The worker will make no changes to itself.
+    * send ***ERROR*** email to the gmail account.
+
+
