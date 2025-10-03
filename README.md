@@ -120,9 +120,16 @@ Purpose: make the app data more compact.
 
 ## worker chron jobs
 
-1. `/backup events`
-Purpose: make sure that  
-    * if workflow fails: no input has been added. The worker will make no changes to itself.
-    * send ***ERROR*** email to the gmail account.
+1. `/admin/backup`
+* can be triggered by an admin clicking a link.
+* is triggered by a cron job every day at 02:00.
 
+Purpose: make sure that the worker data is backed up.
+    1. if there is only one event, that means that no changes have been made, just return.
+    2. else, keep a variable with the snap. keep a variable with the event number.
+    3. try to push the events between 2 and last event to github.
+    4. if this returns ok, then wait for 1min, and then try to get the latest `/data/snap.json`.
+    5. if this `/data/snap.json` is exactly the same as the snap saved in memory, then get any events added since last and then rebuild the events table with [snap, ...eventsSinceSaved].
 
+* if at any time the workflow fails, then just return. This will make the worker just try to upgrade events and its snap state the next day.
+* send an ***ERROR*** email to the gmail account.
