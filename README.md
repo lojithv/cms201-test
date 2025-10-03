@@ -10,10 +10,10 @@ Below is a receipe for how to replicate this project from scratch. It involves a
 => gmail and password
 => github username (and password?)
 => cloudflare username (and password?)
-=> `${projectname}` (no spaces, no special characters, only lowercase letters, numbers and hyphens). //todo should we use `_` instead of `-`??
-2. Create a github repo with the name of the project.
-3. Create a cloudflare project with the name of the project.
-4. Create a console.cloud.google.com project with the name of the project.
+=> `${projectname}` Project name must match `/[a-z][a-z0-9]+/` regex.
+2. Create a github repo named `${projectname}`.
+3. Create a cloudflare project named `${projectname}`.
+4. Create a console.cloud.google.com project named `${projectname}`.
 5. Set up an oauth service. 
     1. select the project, go to "APIs & Services" > "OAuth consent screen". 
     2. Select "External", name: `"${projectname}$ oauth client"`, user support: `gmail`, developer contact: `gmail`, and save. 
@@ -32,7 +32,7 @@ Below is a receipe for how to replicate this project from scratch. It involves a
     1. Go to github.com/settings/tokens
     2. Click "Fine-grained tokens" > "Generate new token"
     3. Name: `${projectname}-worker-events`
-    4. Select project repository <projectname>. (!!!)
+    4. Select project repository ${projectname}$. (!!att!!)
     5. permissions: `actions:write`, `contents:read` and `meta:read`
     6. Expiration: `No expiration`
     7. Click "Generate token"
@@ -45,9 +45,13 @@ Below is a receipe for how to replicate this project from scratch. It involves a
         * Name: `GITHUB_PAT`, `Secret`, => value: `github PAT`
         * Name: `OAUTH_CLIENT_ID`, `Secret`, => value: `google auth client id`
         * Name: `OAUTH_CLIENT_SECRET`, `Secret`, => value: `google auth secret`
-        * Name: `GMAIL`, `Secret`, => value: `gmail`
-        * Name: `PROJECT_NAME`, `Secret`, => value: `${projectname}`
+        * Name: `EMAIL`, `Text`, => value: `gmail`
+        * Name: `PROJECT_NAME`, `Text`, => value: `${projectname}`
+        * Name: `DOMAIN`, `Text`, => value: `<projectname>.workers.dev`
+        * Name: `REPO`, `Text`, => value: `${githubusername}/${projectname}`
     4. Click "Save"
+
+* question: can we use the gmail with cloudflare for sending emails? can we somehow authorize cloudflare to use the gmail account as the sender when we use it's most recent .send() email feature? 
 
 ## Copy files (cli script)
 
