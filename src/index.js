@@ -35,6 +35,10 @@ const UNSECURE_SAME_SITE_PATHS = {
 };
 
 const UNSECURE_PATHS = {
+	// added this v
+	// "GET /": function (req, env, ctx) {
+	// 	return env.ASSETS.fetch(req);
+	// },
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
 		const state = req.url.pathname == "/auth/login" ? "/" :
@@ -257,5 +261,4 @@ async function onFetch(request, env, ctx) {
 
 export default {
 	fetch: onFetch,
-	scheduled: onSchedule,
 };
