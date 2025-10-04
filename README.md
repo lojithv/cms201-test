@@ -81,7 +81,8 @@ Below is a receipe for how to replicate this project from scratch. It involves a
 Purpose: store information about the changes of the app, and who made them. Write events_x_y.json files to the `/data/events/*` folder in the main branch.
 Purpose2: make the app data more compact and with better overview.
     1. ensure that it parses as json. Ensure that it is just an array of objects with id, timestamp, email and json properties? yes?
-    2. add other security meassures such as checking the name of the file matching a speficic format = `/^\/data\/events\/[0-9]+_[0-9]+_[0-9]+:[0-9]+\.json$/` (x_xk_y_yk.json). The format is `x_xk_y_yk.json` where `x` is the start timestamp, `xk` is the start id, `y` is the end timestamp, and `yk` is the end id.
+    1. make the `x_xk_y_yk`. x is the first event timestamp, xk is the first event key, same for y.
+    2. add other security meassures. We is there something that can be done maliciously inside the json text data?
     3. Take the newest `/data/events/*.json` file. If this file plus the incoming file is less than 25mb, then merge them into one file, under a new name, and delete the old file. Otherwise, just add the new file as is.
         0. How to merge two files `x1_y1.json` and `x2_y2.json`?
         1. `x1` and `x2` are the start indexes (both on x_xk format), `y1` and `y2` the end indexes (same format).
@@ -99,6 +100,7 @@ Purpose2: make the app data more compact and with better overview.
 
 ```js
 //todo check this one.
+//todo this needs to be done in the batch script .yml style, likely python or bash, not js. Maybe js could work, but likely much worse than python or bash.
 function Object.assignAssign(...objs) {
   objs = objs.map(o => o.json);
   const res = {};
@@ -135,7 +137,7 @@ function Object.assignAssign(...objs) {
 
 ## worker chron jobs
 
-1. `/admin/backup`
+1. `/api/backup` (secured)
 * can be triggered by an admin clicking a link.
 * is triggered by a cron job every day at 02:00.
 
