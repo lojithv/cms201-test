@@ -103,9 +103,48 @@ const SECURE_PATHS = {
 		await DB(env).confirmRollback(id, req.url.origin, env.settings);
 		return "ok. rollback executed.";
 	},
+	// "GET /api/backup": async function (req, env, ctx, user) {
+	// 	await DB(env).backup(env.settings);
+	// 	return "ok. backup created.";
+	// },
 	"GET /api/backup": async function (req, env, ctx, user) {
-		await DB(env).backup(env.settings);
-		return "ok. backup created.";
+		const db = DB(env);
+		const events = await db.getEventsSinceLastBackup();
+		if (!events || events.length <= 1) return "ok. no changes to backup.";
+		const eventsToBackup = events.slice(1);
+		const lastEvent = eventsToBackup[eventsToBackup.length - 1];
+		if (lastEvent.timestamp === new Date().getTime()) return "ok. waiting for timestamp difference.";
+		const firstEvent = eventsToBackup[0];
+		const fileName = `${firstEvent.timestamp}_${firstEvent.id}_${lastEvent.timestamp}_${lastEvent.id}.json`;
+		const response = await fetch(
+			`https://api.github.com/repos/${env.REPO}/actions/workflows/worker-events.yml/dispatches`,
+			{
+				method: 'POST',
+				headers: {
+					'Authorization': `Bearer ${env.GITHUB_PAT}`,
+					'Accept': 'application/vnd.github+json',
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					ref: 'main',
+					inputs: {
+						file_path: `data/events/${fileName}`,
+						file_content: JSON.stringify(eventsToBackup, null, 2)
+					}
+				})
+			}
+		);
+		if (!response.ok) throw new Error(`GitHub workflow dispatch failed: ${response.status}`);
+		ctx.waitUntil((async () => {
+			try {
+				await new Promise(resolve => setTimeout(resolve, 5000));
+				await db.cleanupEventsBeforeKey(lastEvent.id);
+				await db.markSuccessfulGithubBackup(lastEvent.id);
+			} catch (error) {
+				await db.markFailedGithubBackup(error, lastEvent.id);
+			}
+		})());
+		return "ok. backup initiated.";
 	},
 	"GET /auth/checkLogin": async function (req, env, ctx, user) {
 		return "ok. Already authenticated.";
@@ -142,18 +181,18 @@ function getEndpoint(req, PATHS) {
 function parseSettings(env) {
 	return {
 		domain: env.DOMAIN,
-		backup: {
-			full: {
-				time: Number(env.BACKUP_FULLTIME) * 24 * 3600000,
-				events: env.BACKUP_FULLEVENTS,
-			},
-			partial: {
-				time: Number(env.BACKUP_PARTIALTIME) * 24 * 3600000,
-				events: env.BACKUP_PARTIALEVENTS,
-			},
-			to: env.BACKUP_EMAIL_TO,
-			from: env.BACKUP_EMAIL_FROM,
-		},
+		// backup: {
+		// 	full: {
+		// 		time: Number(env.BACKUP_FULLTIME) * 24 * 3600000,
+		// 		events: env.BACKUP_FULLEVENTS,
+		// 	},
+		// 	partial: {
+		// 		time: Number(env.BACKUP_PARTIALTIME) * 24 * 3600000,
+		// 		events: env.BACKUP_PARTIALEVENTS,
+		// 	},
+		// 	to: env.BACKUP_EMAIL_TO,
+		// 	from: env.BACKUP_EMAIL_FROM,
+		// },
 		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
 		google: {
 			client_id: env.GOOGLE_ID,
@@ -211,10 +250,10 @@ async function onFetch(request, env, ctx) {
 	}
 }
 
-async function onSchedule(controller, env, ctx) {
-	env.settings = parseSettings(env);
-	await DB(env).backup(env.settings);
-}
+// async function onSchedule(controller, env, ctx) {
+// 	env.settings = parseSettings(env);
+// 	await DB(env).backup(env.settings);
+// }
 
 export default {
 	fetch: onFetch,

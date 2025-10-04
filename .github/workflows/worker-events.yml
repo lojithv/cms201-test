@@ -1,0 +1,285 @@
+name: Worker Events Processing
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_path:
+        description: 'Event file path (format: /data/events/x_xk_y_yk.json)'
+        required: true
+        type: string
+      file_content:
+        description: 'JSON content of the event file'
+        required: true
+        type: string
+
+# Security: Minimal required permissions
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  process-events:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Validate inputs
+      env:
+        FILE_PATH: ${{ github.event.inputs.file_path }}
+        FILE_CONTENT: ${{ github.event.inputs.file_content }}
+      run: |
+        echo "Validating inputs..."
+        
+        # Security: Validate file path format
+        if [[ ! "$FILE_PATH" =~ ^/data/events/[0-9]+_[0-9]+_[0-9]+:[0-9]+\.json$ ]]; then
+          echo "❌ Invalid file path format. Expected: /data/events/x_xk_y_yk.json"
+          echo "Received: $FILE_PATH"
+          exit 1
+        fi
+        
+        # Security: Validate JSON structure
+        if ! echo "$FILE_CONTENT" | jq empty 2>/dev/null; then
+          echo "❌ Invalid JSON content"
+          exit 1
+        fi
+        
+        # Security: Validate it's an array
+        if [[ $(echo "$FILE_CONTENT" | jq 'type') != '"array"' ]]; then
+          echo "❌ Content must be a JSON array"
+          exit 1
+        fi
+        
+        # Security: Validate required properties in array elements
+        if ! echo "$FILE_CONTENT" | jq -e 'all(has("id") and has("timestamp") and has("email") and has("json"))' >/dev/null; then
+          echo "❌ All objects must have id, timestamp, email, and json properties"
+          exit 1
+        fi
+        
+        # Security: Check file size (25MB limit = ~26214400 bytes)
+        content_size=$(echo "$FILE_CONTENT" | wc -c)
+        if [ $content_size -gt 26214400 ]; then
+          echo "❌ File content exceeds 25MB limit"
+          exit 1
+        fi
+        
+        echo "✅ Input validation passed"
+        echo "File path: $FILE_PATH"
+        echo "Content size: $content_size bytes"
+
+    - name: Setup directories
+      run: |
+        mkdir -p data/events
+        mkdir -p data/snapWithNull
+
+    - name: Process new event file
+      env:
+        FILE_PATH: ${{ github.event.inputs.file_path }}
+        FILE_CONTENT: ${{ github.event.inputs.file_content }}
+      run: |
+        echo "Processing new event file..."
+        
+        # Extract filename from path
+        filename=$(basename "$FILE_PATH")
+        echo "Processing file: $filename"
+        
+        # Write the new file
+        echo "$FILE_CONTENT" > "data/events/$filename"
+        echo "✅ New event file created: data/events/$filename"
+
+    - name: Merge files if needed
+      run: |
+        echo "Checking for file merging opportunities..."
+        
+        cd data/events
+        
+        # Get all event files sorted by name
+        files=($(ls *.json 2>/dev/null | sort -V || true))
+        
+        if [ ${#files[@]} -lt 2 ]; then
+          echo "Not enough files to merge"
+          exit 0
+        fi
+        
+        # Get the newest file (last in sorted order)
+        newest_file="${files[-1]}"
+        echo "Newest file: $newest_file"
+        
+        # Check if we can merge with the previous file
+        if [ ${#files[@]} -ge 2 ]; then
+          prev_file="${files[-2]}"
+          echo "Previous file: $prev_file"
+          
+          # Check combined size
+          newest_size=$(stat -f%z "$newest_file" 2>/dev/null || stat -c%s "$newest_file")
+          prev_size=$(stat -f%z "$prev_file" 2>/dev/null || stat -c%s "$prev_file")
+          combined_size=$((newest_size + prev_size))
+          
+          echo "Previous file size: $prev_size bytes"
+          echo "Newest file size: $newest_size bytes"
+          echo "Combined size: $combined_size bytes"
+          
+          # If combined size is less than 25MB, merge them
+          if [ $combined_size -lt 26214400 ]; then
+            echo "Merging files..."
+            
+            # Extract timestamps from filenames for new merged filename
+            prev_start=$(echo "$prev_file" | cut -d'_' -f1)
+            newest_end=$(echo "$newest_file" | cut -d'.' -f1 | rev | cut -d'_' -f1 | rev)
+            merged_filename="${prev_start}_${newest_end}.json"
+            
+            echo "Creating merged file: $merged_filename"
+            
+            # Merge JSON arrays
+            prev_content=$(cat "$prev_file" | sed 's/^\s*\[//' | sed 's/\]\s*$//')
+            newest_content=$(cat "$newest_file" | sed 's/^\s*\[//' | sed 's/\]\s*$//')
+            
+            # Create merged content
+            echo "[$prev_content,$newest_content]" > "$merged_filename"
+            
+            # Validate merged JSON
+            if jq empty "$merged_filename" 2>/dev/null; then
+              echo "✅ Successfully merged files into $merged_filename"
+              
+              # Remove old files
+              rm "$prev_file" "$newest_file"
+              echo "✅ Removed old files: $prev_file, $newest_file"
+              
+              # Remove corresponding snapWithNull files
+              cd ../snapWithNull
+              rm -f "$prev_file" 2>/dev/null || true
+              echo "✅ Cleaned up snapWithNull files"
+              cd ../events
+            else
+              echo "❌ Merged JSON is invalid, keeping original files"
+              rm "$merged_filename"
+            fi
+          else
+            echo "Combined size too large, keeping files separate"
+          fi
+        fi
+
+    - name: Generate snapWithNull files
+      run: |
+        echo "Generating snapWithNull files..."
+        
+        cd data/events
+        
+        # Process each event file
+        for event_file in *.json; do
+          if [ ! -f "../snapWithNull/$event_file" ]; then
+            echo "Creating snapWithNull for: $event_file"
+            
+            # Create Node.js script to process the file
+            cat > process_snap.js << 'EOF'
+const fs = require('fs');
+
+function ObjectAssignAssign(...objs) {
+  objs = objs.map(o => o.json);
+  const res = {};
+  for (let obj of objs) {
+    for (let key in obj) {
+      Object.assign(res[key] ??= {}, obj[key]);
+    }
+  }
+  return res;
+}
+
+const eventFile = process.argv[2];
+const events = JSON.parse(fs.readFileSync(eventFile, 'utf8'));
+const snap = ObjectAssignAssign(...events);
+console.log(JSON.stringify(snap, null, 2));
+EOF
+            
+            # Generate snap and save it
+            node process_snap.js "$event_file" > "../snapWithNull/$event_file"
+            echo "✅ Created snapWithNull/$event_file"
+            
+            # Clean up
+            rm process_snap.js
+          else
+            echo "snapWithNull/$event_file already exists"
+          fi
+        done
+
+    - name: Update pages.json and snap.json
+      run: |
+        echo "Updating pages.json and snap.json..."
+        
+        cd data
+        
+        # Create pages list from snapWithNull directory
+        pages_list=$(ls snapWithNull/*.json 2>/dev/null | sed 's/snapWithNull\///' | sed 's/\.json$//' | sort -V || echo "")
+        
+        if [ -n "$pages_list" ]; then
+          echo "$pages_list" | jq -R . | jq -s . > pages.json
+          echo "✅ Updated pages.json with $(echo "$pages_list" | wc -l) pages"
+        else
+          echo "[]" > pages.json
+          echo "✅ Created empty pages.json"
+        fi
+        
+        # Create combined snap from all snapWithNull files
+        cat > create_snap.js << 'EOF'
+const fs = require('fs');
+
+function ObjectAssignAssign(...objs) {
+  objs = objs.map(o => o.json);
+  const res = {};
+  for (let obj of objs) {
+    for (let key in obj) {
+      Object.assign(res[key] ??= {}, obj[key]);
+    }
+  }
+  return res;
+}
+
+const snapFiles = fs.readdirSync('snapWithNull').filter(f => f.endsWith('.json'));
+const allSnaps = [];
+
+for (const file of snapFiles) {
+  const content = JSON.parse(fs.readFileSync(`snapWithNull/${file}`, 'utf8'));
+  allSnaps.push({ json: content });
+}
+
+const finalSnap = ObjectAssignAssign(...allSnaps);
+console.log(JSON.stringify(finalSnap, null, 2));
+EOF
+        
+        if [ -n "$pages_list" ]; then
+          node create_snap.js > snap.json
+          echo "✅ Updated snap.json"
+        else
+          echo "{}" > snap.json
+          echo "✅ Created empty snap.json"
+        fi
+        
+        # Clean up
+        rm create_snap.js
+
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        git add data/
+        
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update event data and snapshots [automated]"
+          git push
+          echo "✅ Changes committed and pushed"
+        fi
+
+    - name: Cleanup and summary
+      run: |
+        echo "=== Processing Summary ==="
+        echo "Events processed: $(ls data/events/*.json 2>/dev/null | wc -l)"
+        echo "Snapshots created: $(ls data/snapWithNull/*.json 2>/dev/null | wc -l)"
+        echo "Pages in pages.json: $(jq length data/pages.json)"
+        echo "✅ Workflow completed successfully"

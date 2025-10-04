@@ -1,8 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
-import { EmailMessage } from "cloudflare:email";
+// import { EmailMessage } from "cloudflare:email";
 import { AesGcmHelper } from "./AesGcmHelper.js";
 
-/*EMAIL*/
+
+
+/*EMAIL - OLD BACKUP SYSTEM - COMMENTED OUT 
 async function strToZipBase64(str) {
   const cs = new CompressionStream('gzip');
   const writer = cs.writable.getWriter();
@@ -52,13 +54,13 @@ async function EmailMessageWithZipAttachment(msg, domain, from, to, contentToBeZ
   ].join("\r\n");
   return await new EmailMessage(from, to, raw);
 }
-/*EMAIL END*/
+EMAIL END*/
 
 export class EventsSnaps extends DurableObject {
 
   constructor(ctx, env) {
     super(ctx, env);
-    this.emailBinding = env.SEND_EMAIL;
+    // this.emailBinding = env.SEND_EMAIL;
     this.sql = this.ctx.storage.sql;
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS events (
@@ -92,6 +94,34 @@ export class EventsSnaps extends DurableObject {
     return this.#aes ??= await AesGcmHelper.make("hello sunshine");
   }
 
+  /* BACKUP */
+  async getEventsSinceLastBackup() {
+    const lastBackupSnap = this.getSnap("lastBackup");
+    const lastBackupEventId = lastBackupSnap?.eventId ?? -1;
+    const res = this.sql.exec(`SELECT * FROM events WHERE id > ? ORDER BY id ASC`, lastBackupEventId).toArray();
+    for (const r of res) r.json = JSON.parse(r.json);
+    return res;
+  }
+
+  async getCurrentSnapshot() {
+    const currentSnap = this.getSnap("all");
+    return currentSnap?.value ?? {};
+  }
+
+  async cleanupEventsBeforeKey(key) {
+    this.sql.exec(`DELETE FROM events WHERE id <= ?`, key);
+    this.upsertSnap("lastBackup", {}, key);
+  }
+
+  markSuccessfulGithubBackup(lastEventId) {
+    this.upsertSnap("lastBackup", { status: "success" }, lastEventId);
+  }
+
+  markFailedGithubBackup(error, lastEventId) {
+    this.upsertSnap("lastBackup", { status: "failed", error: error.message }, lastEventId);
+  }
+
+  /* BACKUP END */
   getEvents(id = -1) {
     const res = this.sql.exec(`SELECT * FROM events WHERE id > ? ORDER BY id ASC`, id).toArray();
     for (const r of res)
@@ -156,6 +186,7 @@ export class EventsSnaps extends DurableObject {
         throw "invalid event: " + JSON.stringify(e);
   }
 
+  /* OLD EMAIL BACKUP SYSTEM - COMMENTED OUT
   async requestRollback(newEvents, host, settings) {
     EventsSnaps.validateEvents(newEvents);
     const { domain, backup: { to, from } } = settings;
@@ -220,6 +251,7 @@ export class EventsSnaps extends DurableObject {
       return this.upsertSnap("partial", 1, newestEventId);
     }
   }
+  OLD EMAIL BACKUP SYSTEM END */
 
   addAll(events) {
     for (const { timestamp, email, json } of events)

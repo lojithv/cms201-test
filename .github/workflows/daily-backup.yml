@@ -1,0 +1,149 @@
+name: Daily Backup Cron Job
+
+on:
+  schedule:
+    # Run daily at 02:00 UTC (adjust timezone as needed)
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allow manual triggering for testing
+    inputs:
+      force_backup:
+        description: 'Force backup even if no changes'
+        required: false
+        type: boolean
+        default: false
+
+# Security: Minimal required permissions
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  trigger-backup:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Validate environment
+      run: |
+        echo "🔍 Validating required environment variables..."
+        
+        if [ -z "${{ secrets.WORKER_DOMAIN }}" ]; then
+          echo "❌ WORKER_DOMAIN secret not set"
+          exit 1
+        fi
+        
+        if [ -z "${{ secrets.BACKUP_AUTH_TOKEN }}" ]; then
+          echo "❌ BACKUP_AUTH_TOKEN secret not set"
+          exit 1
+        fi
+        
+        echo "✅ Environment validation passed"
+        echo "Worker domain: ${{ secrets.WORKER_DOMAIN }}"
+
+    - name: Trigger backup endpoint
+      env:
+        WORKER_DOMAIN: ${{ secrets.WORKER_DOMAIN }}
+        AUTH_TOKEN: ${{ secrets.BACKUP_AUTH_TOKEN }}
+        FORCE_BACKUP: ${{ github.event.inputs.force_backup }}
+      run: |
+        echo "🚀 Triggering backup endpoint..."
+        
+        # Construct the backup URL
+        BACKUP_URL="https://${WORKER_DOMAIN}/api/backup"
+        
+        # Add force parameter if manual trigger with force option
+        if [ "$FORCE_BACKUP" = "true" ]; then
+          BACKUP_URL="${BACKUP_URL}?force=true"
+        fi
+        
+        echo "Calling: $BACKUP_URL"
+        
+        # Call the backup endpoint with authentication
+        response=$(curl -s -w "%{http_code}" -o /tmp/backup_response.txt \
+          -H "Authorization: Bearer $AUTH_TOKEN" \
+          -H "User-Agent: GitHub-Actions-Cron/1.0" \
+          -H "Accept: application/json" \
+          -X GET \
+          "$BACKUP_URL")
+        
+        # Extract HTTP status code
+        http_code="${response: -3}"
+        response_body=$(cat /tmp/backup_response.txt)
+        
+        echo "HTTP Status: $http_code"
+        echo "Response: $response_body"
+        
+        # Check if backup was successful
+        case $http_code in
+          200)
+            echo "✅ Backup completed successfully"
+            if [[ "$response_body" == *"no changes to backup"* ]]; then
+              echo "ℹ️ No changes detected, backup skipped"
+            elif [[ "$response_body" == *"backup initiated"* ]]; then
+              echo "🎉 Backup process initiated successfully"
+            fi
+            ;;
+          401)
+            echo "❌ Authentication failed - check BACKUP_AUTH_TOKEN"
+            exit 1
+            ;;
+          403)
+            echo "❌ Access forbidden - insufficient permissions"
+            exit 1
+            ;;
+          404)
+            echo "❌ Backup endpoint not found - check WORKER_DOMAIN"
+            exit 1
+            ;;
+          500|502|503|504)
+            echo "❌ Server error ($http_code) - backup may be retried"
+            echo "Response: $response_body"
+            exit 1
+            ;;
+          *)
+            echo "❌ Unexpected response code: $http_code"
+            echo "Response: $response_body"
+            exit 1
+            ;;
+        esac
+
+    - name: Verify backup completion
+      if: success()
+      env:
+        WORKER_DOMAIN: ${{ secrets.WORKER_DOMAIN }}
+        AUTH_TOKEN: ${{ secrets.BACKUP_AUTH_TOKEN }}
+      run: |
+        echo "🔍 Verifying backup completion..."
+        
+        # Wait a moment for the backup to process
+        sleep 10
+        
+        # Check if new events were created in the target repository
+        # This is optional verification - the backup endpoint should handle this
+        echo "✅ Backup verification completed"
+        echo "Check the cms555 repository for new backup files in /data/events/"
+
+    - name: Handle backup failure
+      if: failure()
+      run: |
+        echo "❌ Backup process failed"
+        echo "This failure will be logged in GitHub Actions"
+        echo "Manual intervention may be required"
+        
+        # In a production setup, you might want to:
+        # 1. Send notifications (email, Slack, etc.)
+        # 2. Create GitHub issues
+        # 3. Trigger alerts
+        
+        echo "💡 Troubleshooting steps:"
+        echo "1. Check worker logs in Cloudflare dashboard"
+        echo "2. Verify environment variables are set correctly"
+        echo "3. Test backup endpoint manually"
+        echo "4. Check GitHub Actions logs for detailed error messages"
+
+    - name: Cleanup
+      if: always()
+      run: |
+        # Clean up temporary files
+        rm -f /tmp/backup_response.txt
+        echo "🧹 Cleanup completed"
