@@ -39,6 +39,45 @@ const UNSECURE_PATHS = {
 	// "GET /": function (req, env, ctx) {
 	// 	return env.ASSETS.fetch(req);
 	// },
+	"GET /api/backup": async function (req, env, ctx, user) {
+		const db = DB(env);
+		const events = await db.getEventsSinceLastBackup();
+		if (!events || events.length <= 1) return "ok. no changes to backup.";
+		const eventsToBackup = events.slice(1);
+		const lastEvent = eventsToBackup[eventsToBackup.length - 1];
+		if (lastEvent.timestamp === new Date().getTime()) return "ok. waiting for timestamp difference.";
+		const firstEvent = eventsToBackup[0];
+		const fileName = `${firstEvent.timestamp}_${firstEvent.id}_${lastEvent.timestamp}_${lastEvent.id}.json`;
+		const response = await fetch(
+			`https://api.github.com/repos/${env.REPO}/actions/workflows/worker-events.yml/dispatches`,
+			{
+				method: 'POST',
+				headers: {
+					'Authorization': `Bearer ${env.GITHUB_PAT}`,
+					'Accept': 'application/vnd.github+json',
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					ref: 'main',
+					inputs: {
+						file_path: `data/events/${fileName}`,
+						file_content: JSON.stringify(eventsToBackup, null, 2)
+					}
+				})
+			}
+		);
+		if (!response.ok) throw new Error(`GitHub workflow dispatch failed: ${response.status}`);
+		ctx.waitUntil((async () => {
+			try {
+				await new Promise(resolve => setTimeout(resolve, 5000));
+				await db.cleanupEventsBeforeKey(lastEvent.id);
+				await db.markSuccessfulGithubBackup(lastEvent.id);
+			} catch (error) {
+				await db.markFailedGithubBackup(error, lastEvent.id);
+			}
+		})());
+		return "ok. backup initiated.";
+	},
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
 		const state = req.url.pathname == "/auth/login" ? "/" :
@@ -111,45 +150,45 @@ const SECURE_PATHS = {
 	// 	await DB(env).backup(env.settings);
 	// 	return "ok. backup created.";
 	// },
-	"GET /api/backup": async function (req, env, ctx, user) {
-		const db = DB(env);
-		const events = await db.getEventsSinceLastBackup();
-		if (!events || events.length <= 1) return "ok. no changes to backup.";
-		const eventsToBackup = events.slice(1);
-		const lastEvent = eventsToBackup[eventsToBackup.length - 1];
-		if (lastEvent.timestamp === new Date().getTime()) return "ok. waiting for timestamp difference.";
-		const firstEvent = eventsToBackup[0];
-		const fileName = `${firstEvent.timestamp}_${firstEvent.id}_${lastEvent.timestamp}_${lastEvent.id}.json`;
-		const response = await fetch(
-			`https://api.github.com/repos/${env.REPO}/actions/workflows/worker-events.yml/dispatches`,
-			{
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${env.GITHUB_PAT}`,
-					'Accept': 'application/vnd.github+json',
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					ref: 'main',
-					inputs: {
-						file_path: `data/events/${fileName}`,
-						file_content: JSON.stringify(eventsToBackup, null, 2)
-					}
-				})
-			}
-		);
-		if (!response.ok) throw new Error(`GitHub workflow dispatch failed: ${response.status}`);
-		ctx.waitUntil((async () => {
-			try {
-				await new Promise(resolve => setTimeout(resolve, 5000));
-				await db.cleanupEventsBeforeKey(lastEvent.id);
-				await db.markSuccessfulGithubBackup(lastEvent.id);
-			} catch (error) {
-				await db.markFailedGithubBackup(error, lastEvent.id);
-			}
-		})());
-		return "ok. backup initiated.";
-	},
+	// "GET /api/backup": async function (req, env, ctx, user) {
+	// 	const db = DB(env);
+	// 	const events = await db.getEventsSinceLastBackup();
+	// 	if (!events || events.length <= 1) return "ok. no changes to backup.";
+	// 	const eventsToBackup = events.slice(1);
+	// 	const lastEvent = eventsToBackup[eventsToBackup.length - 1];
+	// 	if (lastEvent.timestamp === new Date().getTime()) return "ok. waiting for timestamp difference.";
+	// 	const firstEvent = eventsToBackup[0];
+	// 	const fileName = `${firstEvent.timestamp}_${firstEvent.id}_${lastEvent.timestamp}_${lastEvent.id}.json`;
+	// 	const response = await fetch(
+	// 		`https://api.github.com/repos/${env.REPO}/actions/workflows/worker-events.yml/dispatches`,
+	// 		{
+	// 			method: 'POST',
+	// 			headers: {
+	// 				'Authorization': `Bearer ${env.GITHUB_PAT}`,
+	// 				'Accept': 'application/vnd.github+json',
+	// 				'Content-Type': 'application/json'
+	// 			},
+	// 			body: JSON.stringify({
+	// 				ref: 'main',
+	// 				inputs: {
+	// 					file_path: `data/events/${fileName}`,
+	// 					file_content: JSON.stringify(eventsToBackup, null, 2)
+	// 				}
+	// 			})
+	// 		}
+	// 	);
+	// 	if (!response.ok) throw new Error(`GitHub workflow dispatch failed: ${response.status}`);
+	// 	ctx.waitUntil((async () => {
+	// 		try {
+	// 			await new Promise(resolve => setTimeout(resolve, 5000));
+	// 			await db.cleanupEventsBeforeKey(lastEvent.id);
+	// 			await db.markSuccessfulGithubBackup(lastEvent.id);
+	// 		} catch (error) {
+	// 			await db.markFailedGithubBackup(error, lastEvent.id);
+	// 		}
+	// 	})());
+	// 	return "ok. backup initiated.";
+	// },
 	"GET /auth/checkLogin": async function (req, env, ctx, user) {
 		return "ok. Already authenticated.";
 	},
