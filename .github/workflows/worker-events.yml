@@ -183,7 +183,8 @@ function ObjectAssignAssign(...objs) {
   const res = {};
   for (let obj of objs) {
     for (let key in obj) {
-      Object.assign(res[key] ??= {}, obj[key]);
+      if (!res[key]) res[key] = {};
+      Object.assign(res[key], obj[key]);
     }
   }
   return res;
@@ -232,7 +233,8 @@ function ObjectAssignAssign(...objs) {
   const res = {};
   for (let obj of objs) {
     for (let key in obj) {
-      Object.assign(res[key] ??= {}, obj[key]);
+      if (!res[key]) res[key] = {};
+      Object.assign(res[key], obj[key]);
     }
   }
   return res;
