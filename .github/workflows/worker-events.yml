@@ -194,8 +194,7 @@ jobs:
             const events = JSON.parse(fs.readFileSync(eventFile, 'utf8'));
             const snap = ObjectAssignAssign(...events);
             console.log(JSON.stringify(snap, null, 2));
-            EOF
-            
+EOF
             # Generate snap and save it
             node process_snap.js "$event_file" > "../snapWithNull/$event_file"
             echo "✅ Created snapWithNull/$event_file"
@@ -250,7 +249,7 @@ jobs:
         
         const finalSnap = ObjectAssignAssign(...allSnaps);
         console.log(JSON.stringify(finalSnap, null, 2));
-        EOF
+EOF
         
         if [ -n "$pages_list" ]; then
           node create_snap.js > snap.json
