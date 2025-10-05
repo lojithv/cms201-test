@@ -1,12 +1,5 @@
 {
-  "action": {
-    "0": "c",
-    "1": "r",
-    "2": "e",
-    "3": "a",
-    "4": "t",
-    "5": "e"
-  },
+  "action": "create",
   "data": {
     "title": "Test Event"
   }
