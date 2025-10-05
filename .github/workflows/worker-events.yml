@@ -176,25 +176,25 @@ jobs:
             
             # Create Node.js script to process the file
             cat > process_snap.js << 'EOF'
-const fs = require('fs');
+        const fs = require('fs');
 
-function ObjectAssignAssign(...objs) {
-  objs = objs.map(o => o.json);
-  const res = {};
-  for (let obj of objs) {
-    for (let key in obj) {
-      if (!res[key]) res[key] = {};
-      Object.assign(res[key], obj[key]);
-    }
-  }
-  return res;
-}
+        function ObjectAssignAssign(...objs) {
+          objs = objs.map(o => o.json);
+          const res = {};
+          for (let obj of objs) {
+            for (let key in obj) {
+              if (!res[key]) res[key] = {};
+              Object.assign(res[key], obj[key]);
+            }
+          }
+          return res;
+        }
 
-const eventFile = process.argv[2];
-const events = JSON.parse(fs.readFileSync(eventFile, 'utf8'));
-const snap = ObjectAssignAssign(...events);
-console.log(JSON.stringify(snap, null, 2));
-EOF
+        const eventFile = process.argv[2];
+        const events = JSON.parse(fs.readFileSync(eventFile, 'utf8'));
+        const snap = ObjectAssignAssign(...events);
+        console.log(JSON.stringify(snap, null, 2));
+        EOF
             
             # Generate snap and save it
             node process_snap.js "$event_file" > "../snapWithNull/$event_file"
