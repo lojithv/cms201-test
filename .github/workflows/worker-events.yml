@@ -137,26 +137,25 @@ jobs:
           for event_file in *.json; do
             if [ ! -f "../snapWithNull/$event_file" ]; then
               echo "Creating snapWithNull for: $event_file"
-              cat <<'EOF' > process_snap.js
-const fs = require('fs');
+          cat <<'EOF' > process_snap.js
+          const fs = require('fs');
+          function ObjectAssignAssign(...objs) {
+            objs = objs.map(o => o.json);
+            const res = {};
+            for (let obj of objs) {
+              for (let key in obj) {
+                if (!res[key]) res[key] = {};
+                Object.assign(res[key], obj[key]);
+              }
+            }
+            return res;
+          }
 
-function ObjectAssignAssign(...objs) {
-  objs = objs.map(o => o.json);
-  const res = {};
-  for (let obj of objs) {
-    for (let key in obj) {
-      if (!res[key]) res[key] = {};
-      Object.assign(res[key], obj[key]);
-    }
-  }
-  return res;
-}
-
-const eventFile = process.argv[2];
-const events = JSON.parse(fs.readFileSync(eventFile, 'utf8'));
-const snap = ObjectAssignAssign(...events);
-console.log(JSON.stringify(snap, null, 2));
-EOF
+          const eventFile = process.argv[2];
+          const events = JSON.parse(fs.readFileSync(eventFile, 'utf8'));
+          const snap = ObjectAssignAssign(...events);
+          console.log(JSON.stringify(snap, null, 2));
+          EOF
               node process_snap.js "$event_file" > "../snapWithNull/$event_file"
               echo "✅ Created snapWithNull/$event_file"
               rm process_snap.js
