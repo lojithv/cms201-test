@@ -176,25 +176,25 @@ jobs:
             
             # Create Node.js script to process the file
             cat > process_snap.js << 'EOF'
-            const fs = require('fs');
-            
-            function ObjectAssignAssign(...objs) {
-              objs = objs.map(o => o.json);
-              const res = {};
-              for (let obj of objs) {
-                for (let key in obj) {
-                  if (!res[key]) res[key] = {};
-                  Object.assign(res[key], obj[key]);
-                }
-              }
-              return res;
-            }
-            
-            const eventFile = process.argv[2];
-            const events = JSON.parse(fs.readFileSync(eventFile, 'utf8'));
-            const snap = ObjectAssignAssign(...events);
-            console.log(JSON.stringify(snap, null, 2));
-            EOF
+const fs = require('fs');
+
+function ObjectAssignAssign(...objs) {
+  objs = objs.map(o => o.json);
+  const res = {};
+  for (let obj of objs) {
+    for (let key in obj) {
+      if (!res[key]) res[key] = {};
+      Object.assign(res[key], obj[key]);
+    }
+  }
+  return res;
+}
+
+const eventFile = process.argv[2];
+const events = JSON.parse(fs.readFileSync(eventFile, 'utf8'));
+const snap = ObjectAssignAssign(...events);
+console.log(JSON.stringify(snap, null, 2));
+EOF
             
             # Generate snap and save it
             node process_snap.js "$event_file" > "../snapWithNull/$event_file"
@@ -226,31 +226,31 @@ jobs:
         
         # Create combined snap from all snapWithNull files
         cat > create_snap.js << 'EOF'
-        const fs = require('fs');
-        
-        function ObjectAssignAssign(...objs) {
-          objs = objs.map(o => o.json);
-          const res = {};
-          for (let obj of objs) {
-            for (let key in obj) {
-              if (!res[key]) res[key] = {};
-              Object.assign(res[key], obj[key]);
-            }
-          }
-          return res;
-        }
-        
-        const snapFiles = fs.readdirSync('snapWithNull').filter(f => f.endsWith('.json'));
-        const allSnaps = [];
-        
-        for (const file of snapFiles) {
-          const content = JSON.parse(fs.readFileSync(`snapWithNull/${file}`, 'utf8'));
-          allSnaps.push({ json: content });
-        }
-        
-        const finalSnap = ObjectAssignAssign(...allSnaps);
-        console.log(JSON.stringify(finalSnap, null, 2));
-        EOF
+const fs = require('fs');
+
+function ObjectAssignAssign(...objs) {
+  objs = objs.map(o => o.json);
+  const res = {};
+  for (let obj of objs) {
+    for (let key in obj) {
+      if (!res[key]) res[key] = {};
+      Object.assign(res[key], obj[key]);
+    }
+  }
+  return res;
+}
+
+const snapFiles = fs.readdirSync('snapWithNull').filter(f => f.endsWith('.json'));
+const allSnaps = [];
+
+for (const file of snapFiles) {
+  const content = JSON.parse(fs.readFileSync(`snapWithNull/${file}`, 'utf8'));
+  allSnaps.push({ json: content });
+}
+
+const finalSnap = ObjectAssignAssign(...allSnaps);
+console.log(JSON.stringify(finalSnap, null, 2));
+EOF
         
         if [ -n "$pages_list" ]; then
           node create_snap.js > snap.json
