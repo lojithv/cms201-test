@@ -39,66 +39,6 @@ const UNSECURE_PATHS = {
 	// "GET /": function (req, env, ctx) {
 	// 	return env.ASSETS.fetch(req);
 	// },
-	"GET /api/backup": async function (req, env, ctx, user) {
-		const db = DB(env);
-		const events = await db.getEventsSinceLastBackup();
-		if (!events || events.length <= 1) return "ok. no changes to backup.";
-		const eventsToBackup = events.slice(1);
-		const lastEvent = eventsToBackup[eventsToBackup.length - 1];
-		if (lastEvent.timestamp === new Date().getTime()) return "ok. waiting for timestamp difference.";
-		const firstEvent = eventsToBackup[0];
-		const fileName = `${firstEvent.timestamp}_${firstEvent.id}_${lastEvent.timestamp}_${lastEvent.id}.json`;
-		
-		// Use your own repository where you have access
-		const targetRepo = env.REPO || 'calebdaradal/cms555';
-		console.log("Dispatching to repo:", targetRepo);
-		console.log("Using GitHub PAT:", env.GITHUB_PAT ? `${env.GITHUB_PAT.substring(0, 10)}...` : 'NOT SET');
-		console.log("File path:", `data/events/${fileName}`);
-		
-		const requestBody = {
-			ref: 'main',
-			inputs: {
-				file_path: `data/events/${fileName}`,
-				file_content: JSON.stringify(eventsToBackup, null, 2)
-			}
-		};
-		console.log("Request body:", JSON.stringify(requestBody, null, 2));
-		
-		const response = await fetch(
-			`https://api.github.com/repos/${targetRepo}/actions/workflows/worker-events.yml/dispatches`,
-			{
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${env.GITHUB_PAT}`,
-					'Accept': 'application/vnd.github+json',
-					'Content-Type': 'application/json',
-					'X-GitHub-Api-Version': '2022-11-28',
-					'User-Agent': 'cms201-backup-worker/1.0'
-				},
-				body: JSON.stringify(requestBody)
-			}
-		);
-		
-		console.log("Response status:", response.status);
-		console.log("Response headers:", Object.fromEntries(response.headers.entries()));
-		
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.log("Error response body:", errorText);
-			throw new Error(`GitHub workflow dispatch failed: ${response.status} - ${errorText}`);
-		}
-		
-		ctx.waitUntil((async () => {
-			try {
-				await new Promise(resolve => setTimeout(resolve, 5000));
-				await db.cleanupEventsBeforeKey(lastEvent.id);
-				await db.markSuccessfulGithubBackup(lastEvent.id);
-			} catch (error) {
-				await db.markFailedGithubBackup(error, lastEvent.id);
-			}
-		})());
-		return "ok. backup initiated.";
-	},
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
 		const state = req.url.pathname == "/auth/login" ? "/" :
@@ -177,7 +117,7 @@ const SECURE_PATHS = {
 		const firstEvent = eventsToBackup[0];
 		const fileName = `${firstEvent.timestamp}_${firstEvent.id}_${lastEvent.timestamp}_${lastEvent.id}.json`;
 		
-		// Use your backup repository cms555 as intended
+		// Use your own repository where you have access
 		const targetRepo = env.REPO || 'calebdaradal/cms555';
 		console.log("Dispatching to repo:", targetRepo);
 		console.log("Using GitHub PAT:", env.GITHUB_PAT ? `${env.GITHUB_PAT.substring(0, 10)}...` : 'NOT SET');
@@ -206,7 +146,7 @@ const SECURE_PATHS = {
 				body: JSON.stringify(requestBody)
 			}
 		);
-		
+		//this is always 204, we need to poll
 		console.log("Response status:", response.status);
 		console.log("Response headers:", Object.fromEntries(response.headers.entries()));
 		
@@ -218,6 +158,8 @@ const SECURE_PATHS = {
 		
 		ctx.waitUntil((async () => {
 			try {
+				//todo here we need to delete events from the db that are older than the last successful backup
+				//todo also, we need to poll for new /data/pages.json and /data/snaps.json to see if the events we have are backed up.
 				await new Promise(resolve => setTimeout(resolve, 5000));
 				await db.cleanupEventsBeforeKey(lastEvent.id);
 				await db.markSuccessfulGithubBackup(lastEvent.id);
