@@ -112,20 +112,7 @@ jobs:
             newest_end=$(echo "$newest_file" | cut -d'.' -f1 | rev | cut -d'_' -f1 | rev)
             merged_filename="${prev_start}_${newest_end}.json"
             echo "Creating merged file: $merged_filename"
-
-            prev_content=$(cat "$prev_file" | sed 's/^\s*
-
-\[//' | sed 's/\]
-
-\s*$//')
-newest_content=$(cat "$newest_file" | sed 's/^\s*
-
-\[//' | sed 's/\]
-
-\s*$//')
-
-            echo "[$prev_content,$newest_content]" > "$merged_filename"
-
+            jq -s 'add' "$prev_file" "$newest_file" > "$merged_filename"
             if jq empty "$merged_filename" 2>/dev/null; then
               echo "✅ Successfully merged files into $merged_filename"
               rm "$prev_file" "$newest_file"
