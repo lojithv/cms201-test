@@ -115,10 +115,12 @@ jobs:
 
             prev_content=$(cat "$prev_file" | sed 's/^\s*
 
+prev_content=$(cat "$prev_file" | sed 's/^\s*
+
 \[//' | sed 's/\]
 
 \s*$//')
-            newest_content=$(cat "$newest_file" | sed 's/^\s*
+newest_content=$(cat "$newest_file" | sed 's/^\s*
 
 \[//' | sed 's/\]
 
