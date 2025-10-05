@@ -36,8 +36,8 @@ jobs:
         echo "Validating inputs..."
         
         # Security: Validate file path format
-        if [[ ! "$FILE_PATH" =~ ^/data/events/[0-9]+_[0-9]+_[0-9]+:[0-9]+\.json$ ]]; then
-          echo "❌ Invalid file path format. Expected: /data/events/x_xk_y_yk.json"
+        if [[ ! "$FILE_PATH" =~ ^data/events/[0-9]+_[0-9]+_[0-9]+_[0-9]+\.json$ ]]; then
+          echo "❌ Invalid file path format. Expected: data/events/x_xk_y_yk.json"
           echo "Received: $FILE_PATH"
           exit 1
         fi

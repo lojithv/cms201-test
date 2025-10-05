@@ -48,25 +48,46 @@ const UNSECURE_PATHS = {
 		if (lastEvent.timestamp === new Date().getTime()) return "ok. waiting for timestamp difference.";
 		const firstEvent = eventsToBackup[0];
 		const fileName = `${firstEvent.timestamp}_${firstEvent.id}_${lastEvent.timestamp}_${lastEvent.id}.json`;
+		
+		// Use the actual repository that contains the workflow file
+		const targetRepo = env.REPO || 'orstavik/cms201';
+		console.log("Dispatching to repo:", targetRepo);
+		console.log("Using GitHub PAT:", env.GITHUB_PAT ? `${env.GITHUB_PAT.substring(0, 10)}...` : 'NOT SET');
+		console.log("File path:", `data/events/${fileName}`);
+		
+		const requestBody = {
+			ref: 'main',
+			inputs: {
+				file_path: `data/events/${fileName}`,
+				file_content: JSON.stringify(eventsToBackup, null, 2)
+			}
+		};
+		console.log("Request body:", JSON.stringify(requestBody, null, 2));
+		
 		const response = await fetch(
-			`https://api.github.com/repos/${env.REPO}/actions/workflows/worker-events.yml/dispatches`,
+			`https://api.github.com/repos/${targetRepo}/actions/workflows/worker-events.yml/dispatches`,
 			{
 				method: 'POST',
 				headers: {
 					'Authorization': `Bearer ${env.GITHUB_PAT}`,
 					'Accept': 'application/vnd.github+json',
-					'Content-Type': 'application/json'
+					'Content-Type': 'application/json',
+					'X-GitHub-Api-Version': '2022-11-28',
+					'User-Agent': 'cms201-backup-worker/1.0'
 				},
-				body: JSON.stringify({
-					ref: 'main',
-					inputs: {
-						file_path: `data/events/${fileName}`,
-						file_content: JSON.stringify(eventsToBackup, null, 2)
-					}
-				})
+				body: JSON.stringify(requestBody)
 			}
 		);
-		if (!response.ok) throw new Error(`GitHub workflow dispatch failed: ${response.status}`);
+		
+		console.log("Response status:", response.status);
+		console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+		
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.log("Error response body:", errorText);
+			throw new Error(`GitHub workflow dispatch failed: ${response.status} - ${errorText}`);
+		}
+		
 		ctx.waitUntil((async () => {
 			try {
 				await new Promise(resolve => setTimeout(resolve, 5000));

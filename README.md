@@ -24,10 +24,15 @@ Below is a receipe for how to replicate this project from scratch. It involves a
         - `http://127.0.0.1:3033/api/auth/callback`
 => google auth client id 
 => google auth secret
-6. Connect the cloudflare project to the github repo.
+<!-- 6. Connect the cloudflare project to the github repo.
+    1. Go to the dash.cloudflare.com
+    2. Go to "Compute" > "Workers & Pages" > "Create application" > under "Workers" click "import a repository"
+    3. Connect your github account, and authorize cloudflare to access your github account. -->
+6. Create and connect the cloudflare project to the github repo.
     1. Go to the dash.cloudflare.com
     2. Go to "Compute" > "Workers & Pages" > "Create application" > under "Workers" click "import a repository"
     3. Connect your github account, and authorize cloudflare to access your github account.
+
 7. Create a github workflow dispatch PAT token.
     1. Go to github.com/settings/tokens
     2. Click "Fine-grained tokens" > "Generate new token"
