@@ -218,7 +218,7 @@ jobs:
       - name: Clone target repository (cms555)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}
-          REPO: ${{ secrets.REPO}}
+          REPO: ${{ secrets.REPO }}
         run: |
           git clone https://x-access-token:$GITHUB_TOKEN@github.com/$REPO.git target-repo
           echo "✅ Cloned $REPO repository"
