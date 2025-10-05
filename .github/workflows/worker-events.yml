@@ -115,8 +115,6 @@ jobs:
 
             prev_content=$(cat "$prev_file" | sed 's/^\s*
 
-prev_content=$(cat "$prev_file" | sed 's/^\s*
-
 \[//' | sed 's/\]
 
 \s*$//')
@@ -125,6 +123,7 @@ newest_content=$(cat "$newest_file" | sed 's/^\s*
 \[//' | sed 's/\]
 
 \s*$//')
+
             echo "[$prev_content,$newest_content]" > "$merged_filename"
 
             if jq empty "$merged_filename" 2>/dev/null; then
