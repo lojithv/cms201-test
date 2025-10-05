@@ -218,9 +218,10 @@ jobs:
       - name: Clone target repository (cms555)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}
+          REPO: ${{ secrets.REPO}}
         run: |
-          git clone https://x-access-token:$GITHUB_TOKEN@github.com/orstavik/cms555.git target-repo
-          echo "✅ Cloned cms555 repository"
+          git clone https://x-access-token:$GITHUB_TOKEN@github.com/$REPO.git target-repo
+          echo "✅ Cloned $REPO repository"
 
       - name: Copy processed data to target repository
         run: |
