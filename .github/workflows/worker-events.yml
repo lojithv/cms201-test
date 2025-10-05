@@ -215,18 +215,42 @@ jobs:
 
           rm create_snap.js
 
-      - name: Commit and push changes
+      - name: Clone target repository (cms555)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}
         run: |
+          git clone https://x-access-token:$GITHUB_TOKEN@github.com/orstavik/cms555.git target-repo
+          echo "✅ Cloned cms555 repository"
+
+      - name: Copy processed data to target repository
+        run: |
+          # Create data directory structure in target repo if it doesn't exist
+          mkdir -p target-repo/data/events
+          mkdir -p target-repo/data/snapWithNull
+          
+          # Copy all processed files to target repository
+          cp -r data/* target-repo/data/
+          echo "✅ Copied processed data to cms555"
+
+      - name: Commit and push to cms555
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}
+        run: |
+          cd target-repo
+          
+          # Unset the extra header that can interfere with cross-repo auth
+          git config --unset-all http.https://github.com/.extraheader || true
+          
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add data/
 
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "No changes to commit to cms555"
           else
-            git commit -m "Update event data and snapshots [automated]"
+            git commit -m "Update event data and snapshots from cms201 [automated]"
             git push
-            echo "✅ Changes committed and pushed"
+            echo "✅ Changes committed and pushed to cms555"
           fi
 
       - name: Cleanup and summary
