@@ -216,11 +216,13 @@ jobs:
           rm create_snap.js
 
       - name: Clone target repository (cms555)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}
-          REPO: ${{ secrets.REPO }}
         run: |
-          git clone https://x-access-token:$GITHUB_TOKEN@github.com/$REPO.git target-repo
+          # git clone https://x-access-token:$GITHUB_TOKEN@github.com/$REPO.git target-repo
+          # echo "✅ Cloned $REPO repository"
+          set -a
+          source .dev.vars
+          set +a
+          git clone https://x-access-token:$GITHUB_PAT@github.com/$REPO.git target-repo
           echo "✅ Cloned $REPO repository"
 
       - name: Copy processed data to target repository
