@@ -25,6 +25,7 @@ To run the worker locally, use the commands:
 4. copy the command and run it in a SECOND terminal console in project root folder. This will then trigger the deno server script with correct paramaters.
 5. To debug the workerEvents.js script, you can add `--inspect-brk` after `deno run` in the command above, and then open `chrome://inspect` in a chrome browser to debug it.
 6. To debug the worker code, and press [d] in the FIRST terminal console to open the inspector in a browser.
+7. It is not possible to run the workerEvents.js script on localhost yet.
 
 ## overview 
 
