@@ -1,9 +1,34 @@
 # cms201
 
- > `npx wrangler dev --port 3033`
+## project files
+
+* `.github/workflows/`
+    * `workerEvents.yml`
+* `wrangler.jsonc`
+* `.gitignore`
+* `README.md`
+* `public/*` (static files)
+* `scripts/*` (serverside scripts)
+* `src/*` (worker code)
+* `data/*` (data files)
+    * `snap.json` (current state snapshot)
+    * `pages.json` (list of event pages)
+    * `events/` (folder with event files)
+    * `snaps/` (folder with snapshots matching event pages)
+
+## how to run locally
+
+To run the worker locally, use the commands:
+1. `npx wrangler dev --port 3033` (in the FIRST terminal console in project root folder)
+2. go to `http://127.0.0.1:3033/ai/backup` (login using google oauth as prompted).
+3. in the FIRST terminal, you will see a log entry that looks like this: `deno run --allow-net --allow-read=data/ --allow-write=data/ scripts/workerEvents.js "http://127.0.0.1:3033" "1" "<secret>"`
+4. copy the command and run it in a SECOND terminal console in project root folder. This will then trigger the deno server script with correct paramaters.
+5. To debug the workerEvents.js script, you can add `--inspect-brk` after `deno run` in the command above, and then open `chrome://inspect` in a chrome browser to debug it.
+6. To debug the worker code, and press [d] in the FIRST terminal console to open the inspector in a browser.
+
+## overview 
 
 Below is a receipe for how to replicate this project from scratch. It involves a mix of manual steps and scripts. The goal is to have a fully working Cloudflare Worker project that uses Google OAuth for authentication, GitHub for version control, and Cloudflare Pages for deployment. The project also includes a system for tracking changes and creating snapshots of data.
-
 
 ## 1. Manual steps
 1. Create a **gmail account**, **github account**, **cloudflare account** for the project.
@@ -24,10 +49,7 @@ Below is a receipe for how to replicate this project from scratch. It involves a
         - `http://127.0.0.1:3033/api/auth/callback`
 => google auth client id 
 => google auth secret
-<!-- 6. Connect the cloudflare project to the github repo.
-    1. Go to the dash.cloudflare.com
-    2. Go to "Compute" > "Workers & Pages" > "Create application" > under "Workers" click "import a repository"
-    3. Connect your github account, and authorize cloudflare to access your github account. -->
+
 6. Create and connect the cloudflare project to the github repo.
     1. Go to the dash.cloudflare.com
     2. Go to "Compute" > "Workers & Pages" > "Create application" > under "Workers" click "import a repository"
@@ -66,27 +88,13 @@ Below is a receipe for how to replicate this project from scratch. It involves a
 
 * question: can we use the gmail with cloudflare for sending emails? can we somehow authorize cloudflare to use the gmail account as the sender when we use it's most recent .send() email feature? 
 
-## Copy files (cli script)
+## create a fork of the cms201 repo
 
-0. make a `README.md` and `wrangler.jsonc` file with the content of this file.
-1. commit `README.md` and `wrangler.jsonc` plus `.gitignore`, `public/*`, `src/*`, `data/*` to the github repo.
-2. Wait for 1min. 10sec?
+0. update the .dev.vars file with the values from above.
+1. change the project name in `wrangler.jsonc` and `README.md` to `${projectname}`.
+2. commit the repo to github as a new repo with the name ${projectname}.
+2. Wait for 1min??
 3. fetch `https://<projectname>.workers.dev/startup`. Make sure that it returns the same state as in the snapshot.json inside make sure that it returns the same value as was in the `data` branch commit.
-
-* Have the following files in the repo:
-    * `.github/workflows/`
-        * `workerEvents.yml`
-    * `wrangler.jsonc`
-    * `.gitignore`
-    * `README.md`
-    * `public/*` (static files)
-    * `scripts/*` (serverside scripts)
-    * `src/*` (worker code)
-    * `data/*` (data files)
-        * `snap.json` (current state snapshot)
-        * `pages.json` (list of event pages)
-        * `events/` (folder with event files)
-        * `snapWithNull/` (folder with snapshots matching event pages)
 
 ## Github actions script
 
