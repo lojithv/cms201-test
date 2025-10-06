@@ -1,6 +1,6 @@
 export class AesGcmHelper {
-  constructor(key) {
-    this.key = key; // This should already be a CryptoKey
+  constructor(cryptoKey) {
+    this.key = cryptoKey;
   }
 
   static async make(password) {
