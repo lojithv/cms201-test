@@ -56,8 +56,10 @@ async function main(origin, lastEventId, secret) {
   console.log("1.", input.txt);
   const snapOld = await Deno.readTextFile('data/snap.json');
   console.log("8.", JSON.stringify(snapOld));
-  if (!input.events.length)
+  if (!input.events.length) {
+    console.log("no new events, just sending the newest snap back.");
     return await sendResult(`${origin}/api/cleanUpEventsAndSnap/${lastEventId}`, secret, snapOld);
+  }
   const pages = await readDirectory('data/events');
   console.log("2.", JSON.stringify(pages));
 
@@ -96,10 +98,10 @@ async function main(origin, lastEventId, secret) {
     data ? Deno.writeTextFile(path, data) : Deno.remove(path)));
   console.log("10. wrote files", origin, lastEventId);
 
-  const theEnd = await sendResult(
+  return await sendResult(
     `${origin}/api/cleanUpEventsAndSnap/${lastEventId}`,
     secret, ops['data/snap.json']);
-  console.log("11.", theEnd);
 }
 
-main(...Deno.args);
+const end = main(...Deno.args);
+console.log("end.", res);
