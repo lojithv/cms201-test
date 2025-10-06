@@ -13,65 +13,69 @@ function createXKXYKY(events) {
   return `${x}_${kx}_${y}_${ky}.json`;
 }
 
-const ORIGIN = Deno.args[0];
-const WORKER_LAST_EVENT_ID = parseInt(Deno.args[1]);
-const WORKER_SECRET = Deno.args[2];
+async function readDirectory(path) {
+  const pages = [];
+  for await (const entry of Deno.readDir(path))
+    if (entry.isFile && entry.name.endsWith('.json'))
+      pages.push(entry.name.slice(0, -5));
+  pages.sort();
+  return pages;
+}
+
+async function readInput(url, secret) {
+  const txt = await (await fetch(url, { headers: { 'Authorization': `Bearer ${secret}` } })).text();
+  const size = new TextEncoder().encode(txt).length;
+  const events = JSON.parse(txt);
+  return { events, size, txt };
+}
+
+async function readLastFile(path) {
+  const txt = await Deno.readTextFile(path);
+  const size = new TextEncoder().encode(txt).length;
+  const events = JSON.parse(txt);
+  return { events, size, txt };
+}
+
 // await Deno.mkdir("data/events", { recursive: true });
 // await Deno.mkdir("data/snaps", { recursive: true });
 
-const input = await fetch(`${ORIGIN}/api/eventsOlderThan/${WORKER_LAST_EVENT_ID}`, {
-  headers: {
-    'Authorization': `Bearer ${WORKER_SECRET}`
+const [origin, lastEventId, secret] = Deno.args;
+const input = await readInput(`${origin}/api/eventsOlderThan/${lastEventId}`, secret);
+const pages = await readDirectory('data/events');
+
+const ops = {};
+
+if (input.size < 10_000_000) {
+  const lastFileName = pages[pages.length - 1] + ".json";
+  const lastFile = await readLastFile('data/events/' + lastFileName);
+  if ((lastFile.size + input.size) < 10_000_000) {
+    input.events = [...lastFile.events, ...input.events];
+    input.txt = JSON.stringify(input.events);
+    input.size += lastFile.size;
+    ops['/data/events/' + lastFileName] = null;
+    ops['/data/snaps/' + lastFileName] = null;
+    pages.pop();
   }
-});
-const events = await input.json();
-const eventsSize = new TextEncoder().encode(JSON.stringify(events)).length;
-
-//the latest events file, should be the last.
-const pages = [];
-for await (const entry of Deno.readDir('/data/events/')) {
-  if (entry.isFile && entry.name.endsWith('.json'))
-    pages.push(entry.name.slice(0, -5));
 }
-pages.sort();
-const latestFile = pages[pages.length - 1];
-const latestEvents = JSON.parse(await Deno.readTextFile('/data/events/' + latestFile));
-const latestEventsSize = new TextEncoder().encode(JSON.stringify(latestEvents)).length;
-
-const saveFiles = {};
-const unlinkFiles = {};
-let snapWithNull, timestampName;
-if ((latestEventsSize + eventsSize) > 10_000_000) { //10MB max per file
-  timestampName = createXKXYKY(events);
-  snapWithNull = ObjectAssignAssign(events);
-  saveFiles['/data/events/' + timestampName] = JSON.stringify(events);
-  saveFiles['/data/snaps/' + timestampName] = JSON.stringify(snapWithNull);
-} else {
-  const events2 = [...latestEvents, ...events];
-  timestampName = createXKXYKY(events2);
-  snapWithNull = ObjectAssignAssign(events2);
-  saveFiles['/data/events/' + timestampName] = JSON.stringify(events2);
-  saveFiles['/data/snaps/' + timestampName] = JSON.stringify(snapWithNull);
-  unlinkFiles['/data/events/' + latestFile];
-  unlinkFiles['/data/snaps/' + latestFile];
-  pages.pop(); //latest page is last in list
-}
-
-const latestSnap = JSON.parse(await Deno.readTextFile('/data/snaps.json'));
-const newSnap = ObjectAssignAssign([latestSnap, { json: snapWithNull }]);
+const timestampName = createXKXYKY(input.events);
+const snapWithNull = ObjectAssignAssign(input.events);
+const snapOld = JSON.parse(await Deno.readTextFile('/data/snap.json'));
+const snap = ObjectAssignAssign([snapOld, snapWithNull]);
 pages.push(timestampName);
-saveFiles['/data/snaps.json'] = JSON.stringify(newSnap);
-saveFiles['/data/pages.json'] = JSON.stringify(pages.map(f => f.replace('.json', '')));
-await Promise.all([
-  ...Object.entries(saveFiles).map(([path, data]) => Deno.writeTextFile(path, data)),
-  ...Object.entries(unlinkFiles).map(([path]) => Deno.remove(path))
-]);
 
-const followThrough = await fetch(`https://${ORIGIN}/api/cleanUpEventsAndSnap/${WORKER_LAST_EVENT_ID}`, {
+ops['/data/events/' + timestampName] = input.txt;
+ops['/data/snaps/' + timestampName] = JSON.stringify(snapWithNull);
+ops['/data/pages.json'] = JSON.stringify(pages);
+ops['/data/snap.json'] = JSON.stringify(snap);
+
+await Promise.all(Object.entries(ops).map(([path, data]) =>
+  data ? Deno.writeTextFile(path, data) : Deno.remove(path)));
+
+const followThrough = await fetch(`${origin}/api/cleanUpEventsAndSnap/${lastEventId}`, {
   headers: {
     method: 'POST',
-    'Authorization': `Bearer ${WORKER_SECRET}`,
+    'Authorization': `Bearer ${secret}`,
     'Content-Type': 'application/json'
   },
-  body: saveFiles['/data/snaps.json']
+  body: ops['/data/snap.json']
 });
