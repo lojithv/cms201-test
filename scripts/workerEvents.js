@@ -41,36 +41,45 @@ async function readLastFile(path) {
 
 const [origin, lastEventId, secret] = Deno.args;
 const input = await readInput(`${origin}/api/eventsOlderThan/${lastEventId}`, secret);
+console.log("1.", input.txt);
 const pages = await readDirectory('data/events');
+console.log("2.", JSON.stringify(pages));
 
 const ops = {};
 
 if (input.size < 10_000_000) {
   const lastFileName = pages[pages.length - 1] + ".json";
   const lastFile = await readLastFile('data/events/' + lastFileName);
+  console.log("3.", lastFile.txt);
   if ((lastFile.size + input.size) < 10_000_000) {
     input.events = [...lastFile.events, ...input.events];
     input.txt = JSON.stringify(input.events);
     input.size += lastFile.size;
-    ops['/data/events/' + lastFileName] = null;
-    ops['/data/snaps/' + lastFileName] = null;
+    ops['data/events/' + lastFileName] = null;
+    ops['data/snaps/' + lastFileName] = null;
     pages.pop();
+    console.log("4. merged with last file");
+    console.log("5.", input.txt);
+    console.log("6.", JSON.stringify(pages));
   }
 }
 const timestampName = createXKXYKY(input.events);
-const snapWithNull = ObjectAssignAssign(input.events);
-const snapOld = JSON.parse(await Deno.readTextFile('/data/snap.json'));
-const snap = ObjectAssignAssign([snapOld, snapWithNull]);
 pages.push(timestampName);
+const snapWithNull = ObjectAssignAssign(input.events);
+console.log("7.", JSON.stringify(pages), JSON.stringify(snapWithNull));
+const snapOld = JSON.parse(await Deno.readTextFile('data/snap.json'));
+console.log("8.", JSON.stringify(snapOld));
+const snap = ObjectAssignAssign([snapOld, snapWithNull]);
+console.log("9.", JSON.stringify(snap));
 
-ops['/data/events/' + timestampName] = input.txt;
-ops['/data/snaps/' + timestampName] = JSON.stringify(snapWithNull);
-ops['/data/pages.json'] = JSON.stringify(pages);
-ops['/data/snap.json'] = JSON.stringify(snap);
+ops['data/events/' + timestampName + ".json"] = input.txt;
+ops['data/snaps/' + timestampName + ".json"] = JSON.stringify(snapWithNull);
+ops['data/pages.json'] = JSON.stringify(pages);
+ops['data/snap.json'] = JSON.stringify(snap);
 
 await Promise.all(Object.entries(ops).map(([path, data]) =>
   data ? Deno.writeTextFile(path, data) : Deno.remove(path)));
-
+console.log("10. wrote files");
 const followThrough = await fetch(`${origin}/api/cleanUpEventsAndSnap/${lastEventId}`, {
   headers: {
     method: 'POST',
@@ -79,3 +88,6 @@ const followThrough = await fetch(`${origin}/api/cleanUpEventsAndSnap/${lastEven
   },
   body: ops['/data/snap.json']
 });
+
+const endResult = followThrough.ok ? "ok" : `error: ${await followThrough.text()}`;
+console.log("11.", endResult);
