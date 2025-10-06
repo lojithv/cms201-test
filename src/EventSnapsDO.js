@@ -95,31 +95,31 @@ export class EventsSnaps extends DurableObject {
   }
 
   /* BACKUP */
-  async getEventsSinceLastBackup() {
-    const lastBackupSnap = this.getSnap("lastBackup");
-    const lastBackupEventId = lastBackupSnap?.eventId ?? -1;
-    const res = this.sql.exec(`SELECT * FROM events WHERE id > ? ORDER BY id ASC`, lastBackupEventId).toArray();
-    for (const r of res) r.json = JSON.parse(r.json);
-    return res;
-  }
+  // async getEventsSinceLastBackup() {
+  //   const lastBackupSnap = this.getSnap("lastBackup");
+  //   const lastBackupEventId = lastBackupSnap?.eventId ?? -1;
+  //   const res = this.sql.exec(`SELECT * FROM events WHERE id > ? ORDER BY id ASC`, lastBackupEventId).toArray();
+  //   for (const r of res) r.json = JSON.parse(r.json);
+  //   return res;
+  // }
 
   async getCurrentSnapshot() {
     const currentSnap = this.getSnap("all");
     return currentSnap?.value ?? {};
   }
 
-  async cleanupEventsBeforeKey(key) {
-    this.sql.exec(`DELETE FROM events WHERE id <= ?`, key);
-    this.upsertSnap("lastBackup", {}, key);
-  }
+  // async cleanupEventsBeforeKey(key) {
+  //   this.sql.exec(`DELETE FROM events WHERE id <= ?`, key);
+  //   this.upsertSnap("lastBackup", {}, key);
+  // }
 
-  markSuccessfulGithubBackup(lastEventId) {
-    this.upsertSnap("lastBackup", { status: "success" }, lastEventId);
-  }
+  // markSuccessfulGithubBackup(lastEventId) {
+  //   this.upsertSnap("lastBackup", { status: "success" }, lastEventId);
+  // }
 
-  markFailedGithubBackup(error, lastEventId) {
-    this.upsertSnap("lastBackup", { status: "failed", error: error.message }, lastEventId);
-  }
+  // markFailedGithubBackup(error, lastEventId) {
+  //   this.upsertSnap("lastBackup", { status: "failed", error: error.message }, lastEventId);
+  // }
 
   /* BACKUP END */
   getEvents(id = -1) {
@@ -127,6 +127,22 @@ export class EventsSnaps extends DurableObject {
     for (const r of res)
       r.json = JSON.parse(r.json);
     return res;
+  }
+
+  getEventsOlderThan(id) {
+    const res = this.sql.exec(`SELECT * FROM events WHERE id < ? ORDER BY id ASC`, id).toArray();
+    for (const r of res)
+      r.json = JSON.parse(r.json);
+    return res;
+  }
+
+  //todo first id = 1
+  cleanUpEventsAndSnap(id, newSnap) {
+    const newEvents = this.sql.exec(`SELECT * FROM events WHERE id > ? ORDER BY id ASC`, id).toArray();
+    this.sql.exec(`DELETE FROM events`);
+    this.addEvent("system", newSnap);
+    for (const e of newEvents)
+      this.sql.exec(`INSERT INTO events (timestamp, email, json) VALUES (?, ?, ?)`, e.timestamp, e.email, e.json);
   }
 
   getLastEventId() {

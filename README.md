@@ -43,6 +43,14 @@ Below is a receipe for how to replicate this project from scratch. It involves a
     7. Click "Generate token"
     8. Copy the token
 => github PAT
+8. Update github environment variable DOMAIN.
+    1. Go to github.com/${githubusername}/${projectname}/settings/environments
+    2. Click "New environment"
+    3. Name: `production`
+    4. Click "Configure environment"
+    5. Click "Add variable"
+        * Name: `DOMAIN`, => value: `<projectname>.workers.dev`
+    6. Click "Save variables"
 8. Update Cloudflare enviroment variables:
     1. Go to dash.cloudflare.com
     2. Go to "Compute" > "Workers & Pages" > select your project > "Settings" > "Environment Variables"
@@ -67,11 +75,12 @@ Below is a receipe for how to replicate this project from scratch. It involves a
 
 * Have the following files in the repo:
     * `.github/workflows/`
-        * `worker-events.yml`
+        * `workerEvents.yml`
     * `wrangler.jsonc`
     * `.gitignore`
     * `README.md`
     * `public/*` (static files)
+    * `scripts/*` (serverside scripts)
     * `src/*` (worker code)
     * `data/*` (data files)
         * `snap.json` (current state snapshot)
