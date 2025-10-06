@@ -1,0 +1,60 @@
+name: WorkerEvents
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_content:
+        description: 'JSON string with the events'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  process-events:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.x
+          cache: true
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: handling incoming json text as tmp.json and running deno script
+        env:
+          WORKER_SECRET: ${{ github.event.inputs.secret }}
+          WORKER_LAST_EVENT_ID: ${{ github.event.inputs.lastEventId }}
+          DOMAIN: ${{ github.environment.domain }} # todo add the domain to the github environment variables for this repository
+          
+        run: |
+          echo "Deno script starting (yml)..."
+          deno run --allow-read=data/ --allow-write=data/ scripts/workerEvents.js "$DOMAIN" "$WORKER_LAST_EVENT_ID" "$WORKER_SECRET"
+          echo "✅ Deno script completed (yml)."
+
+      - name: Commit and push to repository
+        env:
+          token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Unset the extra header that can interfere with cross-repo auth
+          # git config --unset-all http.https://github.com/.extraheader || true   # do we really need this?
+          
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add data/
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update event data and snapshots from cms201 [automated]"
+            git push
+            echo "✅ Changes committed and pushed to cms201"
+          fi
