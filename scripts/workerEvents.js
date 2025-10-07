@@ -31,47 +31,43 @@ async function readLastFile(path) {
 }
 
 async function main(origin, lastEventId, secret) {
-  const input = await readInput(`${origin}/api/eventsOlderThan/${lastEventId}`, secret);
+  const input = await readInput(`${origin}/api/events`, secret);
   console.log("1.", input.txt);
   if (!input.events.length)
     return console.log("no new events, ending.");
 
-  const oldSnap = await Deno.readTextFile('data/snap.json');
-  console.log("2.", JSON.stringify(oldSnap));
-  const pages = await readDirectoryWithoutJson('data/events');
-  console.log("3.", JSON.stringify(pages));
+  const serverState = JSON.parse(await Deno.readTextFile('public/data/state.json'));
+  console.log("2.", JSON.stringify(serverState));
 
   const ops = {};
 
   if (input.size < 10_000_000) {
-    const lastFileName = pages[pages.length - 1];
-    const lastFile = await readLastFile('data/events/' + lastFileName);
+    const lastFileName = serverState.pages.at(-1) + '.json';
+    const lastFile = await readLastFile('public/data/events/' + lastFileName);
     console.log("4.", lastFile.txt);
     if ((lastFile.size + input.size) < 10_000_000) {
       input.events = [...lastFile.events, ...input.events];
       input.txt = JSON.stringify(input.events);
       input.size += lastFile.size;
-      ops['data/events/' + lastFileName] = null;
+      ops['public/data/events/' + lastFileName] = null;
       pages.pop();
       console.log("5.", "new merged", input.txt);
       console.log("6.", JSON.stringify(pages));
     }
   }
-  const { timestamp: x, id: kx } = events[0];
-  const { timestamp: y, id: ky } = events[events.length - 1];
+  const { timestamp: x, id: kx } = input.events[0];
+  const { timestamp: y, id: ky } = input.events.at(-1);
   const timestampName = `${x}_${kx}_${y}_${ky}`;
   pages.push(timestampName);
 
-  const oldSnapObj = JSON.parse(oldSnap);
-  const newSnapObj = ObjectAssignAssign([oldSnapObj, ...input.events]);
-  const newSnap = {
+  const newState = {
     lastEventId,
-    snap: newSnapObj,
-    pages: pages
+    snap: ObjectAssignAssign([serverState.snap, ...input.events.map(e => e.json)]),
+    pages
   };
-  console.log("7.", JSON.stringify(newSnap));
-  ops['data/events/' + timestampName + '.json'] = input.txt;
-  ops['public/snap.json'] = JSON.stringify(newSnap);
+  console.log("7.", JSON.stringify(newState));
+  ops['public/data/events/' + timestampName + '.json'] = input.txt;
+  ops['public/state.json'] = JSON.stringify(newState);
 
   await Deno.mkdir("data/events", { recursive: true });
   await Promise.all(Object.entries(ops).map(([path, data]) =>
