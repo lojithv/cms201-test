@@ -1,6 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
 
-
 // ObjectAssignAssign({alice: {}, bob: {one: 1, two: 2}}, {bob: {two: 4}})
 // => { alice: {}, bob: {one: 1, two: 4} } // note that the bob.one was left intact
 function ObjectAssignAssign(...objs) {
@@ -16,6 +15,7 @@ function ObjectAssignAssign(...objs) {
 
 export class EventsSnaps extends DurableObject {
 
+  #startState;
   #currentState;
 
   constructor(ctx, env) {
@@ -32,13 +32,14 @@ CREATE TABLE IF NOT EXISTS events (
   }
 
   async initialize(env) {
-    const startState = await (await env.ASSETS.fetch("snap.json")).json();
-    if (this.#currentState?.lastEventId >= startState.lastEventId)
+    const startState = await (await env.ASSETS.fetch("state.json")).json();
+    if (this.#startState?.lastEventId >= startState.lastEventId)
       return;
-    this.#currentState = startState;
+    this.#startState = this.#currentState = startState;
     this.sql.exec(`DELETE FROM events WHERE id <= ?`, startState.lastEventId); //todo unsafe
-    const events = this.getEvents().map(e => e.json);
-    ObjectAssignAssign(this.#currentState.snap, ...events);
+    const events = this.getEvents();
+    ObjectAssignAssign(this.#currentState.snap, ...events.map(e => e.json));
+    this.#currentState.lastEventId = events.at(-1).id;
 
     //todo make unsafe safer
     //todo how can we make this safer? I am worried about problems with the id being lower or something
@@ -70,7 +71,6 @@ CREATE TABLE IF NOT EXISTS events (
   getSnap(name, cb) {
     if (!name) return this.#currentState.snap;
     if (!cb) throw new Error("You must provide a callback to process the snap in order to get a custom snap.");
-    this.#currentState.snaps ??= {};
-    return this.#currentState.snaps[name] ??= cb(this.#currentState.snap);
+    return (this.#currentState.snaps ??= {})[name] ??= cb(this.#currentState.snap);
   }
 }
