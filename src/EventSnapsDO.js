@@ -3,14 +3,12 @@ import { DurableObject } from "cloudflare:workers";
 // ObjectAssignAssign({alice: {}, bob: {one: 1, two: 2}}, {bob: {two: 4}})
 // => { alice: {}, bob: {one: 1, two: 4} } // note that the bob.one was left intact
 function ObjectAssignAssign(...objs) {
-  const result = {};
+  const res = {};
   for (const obj of objs)
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] ??= {};
-      for (const innerKey of value)
-        result[key][innerKey] = Object.assign(result[key][innerKey] ?? {}, obj[key]);
-    }
-  return result;
+    for (const [key, obj2] of Object.entries(obj))
+      for (let [key2, value] of Object.entries(obj2))
+        (res[key] ??= {})[key2] = value;
+  return res;
 }
 
 export class EventsSnaps extends DurableObject {
@@ -28,25 +26,34 @@ CREATE TABLE IF NOT EXISTS events (
   email TEXT,
   json TEXT
 );`);
-    ctx.blockConcurrencyWhile(_ => this.initialize(env));
+    ctx.blockConcurrencyWhile(async () => {
+      const res = await this.env.ASSETS.fetch(new URL("/data/state.json", "https://assets.local"));
+      if (!res.ok) throw new Error(`ASSETS fetch failed: ${res.status}`);
+      const startState = await res.json();
+      if (this.#startState?.lastEventId >= startState.lastEventId)
+        return;
+      this.#startState = this.#currentState = startState;
+      this.sql.exec(`DELETE FROM events WHERE id <= ?`, startState.lastEventId); //todo unsafe
+      const events = this.getEvents();
+      if (!events.length)
+        return;
+      ObjectAssignAssign(this.#currentState.snap, ...events.map(e => e.json));
+      this.#currentState.lastEventId = events.at(-1).id;
+
+      //todo make unsafe safer
+      //todo how can we make this safer? I am worried about problems with the id being lower or something
+      //todo should we use both timestamp and id? 
+      //If we then get some events with the same event id, but different timestamp, we have an error point.
+      //we might also like to check all the events. That will be waaay slower. Nah.. Github must be the source of truth.
+      //how do we check that the event is stored in github. We would then need to check the last page on github and verify one by one.
+    });
   }
 
-  async initialize(env) {
-    const startState = await (await env.ASSETS.fetch("data/state.json")).json();
-    if (this.#startState?.lastEventId >= startState.lastEventId)
-      return;
-    this.#startState = this.#currentState = startState;
-    this.sql.exec(`DELETE FROM events WHERE id <= ?`, startState.lastEventId); //todo unsafe
-    const events = this.getEvents();
-    ObjectAssignAssign(this.#currentState.snap, ...events.map(e => e.json));
-    this.#currentState.lastEventId = events.at(-1).id;
-
-    //todo make unsafe safer
-    //todo how can we make this safer? I am worried about problems with the id being lower or something
-    //todo should we use both timestamp and id? 
-    //If we then get some events with the same event id, but different timestamp, we have an error point.
-    //we might also like to check all the events. That will be waaay slower. Nah.. Github must be the source of truth.
-    //how do we check that the event is stored in github. We would then need to check the last page on github and verify one by one.
+  getEvents() {
+    const res = this.sql.exec(`SELECT * FROM events`).toArray();
+    for (const r of res)
+      r.json = JSON.parse(r.json);
+    return res;
   }
 
   addEvent(email, json) {
@@ -59,13 +66,6 @@ CREATE TABLE IF NOT EXISTS events (
       pages: this.#currentState.pages,
     };
     return this.#currentState = newState;
-  }
-
-  getEvents() {
-    const res = this.sql.exec(`SELECT * FROM events`).toArray();
-    for (const r of res)
-      r.json = JSON.parse(r.json);
-    return res;
   }
 
   getSnap(name, cb) {

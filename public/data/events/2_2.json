@@ -1,1 +1,16 @@
-[{"id":"2","timestamp":"1759765389221","email":"user@example.com","json":{"action":"create","data":{"title":"Test Event"}}}]
+[
+  {
+    "id": "2",
+    "timestamp": "1759765389221",
+    "email": "user@example.com",
+    "json": {
+      "alice": {
+        "one": "one",
+        "two": "two"
+      },
+      "bob": {
+        "title": "Test"
+      }
+    }
+  }
+]

@@ -1,10 +1,15 @@
 {
   "lastEventId": 2,
   "snap": {
-    "action": "create",
-    "data": {
-      "title": "Test Event"
+    "alice": {
+      "one": "one",
+      "two": "two"
+    },
+    "bob": {
+      "title": "Test"
     }
   },
-  "pages": ["2_2"]
+  "pages": [
+    "2_2"
+  ]
 }

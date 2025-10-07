@@ -170,8 +170,7 @@ function getEndpoint(req, PATHS) {
 			return PATHS[key];
 }
 
-async function init(env) {
-	await DB(env).initialize(env);
+async function settings(env) {
 	return {
 		origin: env.ORIGIN,
 		// backup: {
@@ -215,7 +214,7 @@ function getCookie(request, name) {
 
 async function onFetch(request, env, ctx) {
 	try {
-		env.settings ??= await init(env); // (ctx?/env?).blockConcurrencyWhile() //todo add this!
+		env.settings ??= await settings(env);
 
 		Object.defineProperty(request, "url", { value: new URL(request.url) });
 		let endPoint = getEndpoint(request, UNSECURE_PATHS);
@@ -257,7 +256,7 @@ async function onFetch(request, env, ctx) {
 }
 
 async function onSchedule(controller, env, ctx) {
-	env.settings ??= init(env);
+	env.settings ??= settings(env);
 	await SECURE_PATHS["GET /api/backup"](undefined, env, ctx);
 }
 
