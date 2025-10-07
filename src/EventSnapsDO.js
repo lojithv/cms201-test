@@ -12,8 +12,8 @@ export class EventsSnaps extends DurableObject {
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   timestamp INTEGER DEFAULT (strftime('%s','now')),
-  email TEXT REQUIRED,
-  json TEXT REQUIRED
+  email TEXT,
+  json TEXT
 );`);
     ctx.blockConcurrencyWhile(_ => this.initialize(env));
   }
