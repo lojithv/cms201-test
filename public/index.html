@@ -3,66 +3,44 @@
 
 <body>
 
+	<script>
+		async function postJson(e) {
+			event.preventDefault();
+			const form = e.target;
+			const body = form.querySelector('textarea').value.trim();
+			const res = await fetch(form.action, { method: "POST", headers: { 'Content-Type': 'application/json' }, body });
+			const text = await res.text();
+			console.log(res.status, text);
+		}
+	</script>
+
 	<ol>
 		<lh>GET manual</lh>
 		<li><a href="/auth/login">Log in (click to test)</a></li>
 		<li><a href="/auth/logout">Log out (click to test)</a></li>
-		
+
 		<lh>GET check content of new window</lh>
 		<li><a href="/api/snap" target="_blank">/api/snap/</a></li>
-		<li><a href="/api/snap/full" target="_blank">/api/snap/full</a></li>
-		<li><a href="/api/events" target="_blank">/api/events</a></li>
-		<li><a href="/api/events/12345" target="_blank">/api/events/12345</a></li>
+		<li><a href="/api/snap/notNull" target="_blank">/api/snap/full</a></li>
 
-		<lh>GET check content of new window (and check content of /api/events/)</lh>
-		<li><a href="/api/clear" target="_blank">clear</a></li>
-		
+		<li><a href="/api/events" target="_blank">/api/events</a></li>
+		<li><a href="/api/events/2" target="_blank">/api/events/2</a></li>
+
 		<lh>GET check content of email and new window</lh>
 		<li><a href="/api/backup" target="_blank">backup</a></li>
-	
-		<lh>POST check content of new window (or check content of /api/events/)</lh>
-		<li>
-			<form method="POST" action="/api/addEvent" target="_blank">
+
+		<lh>POST check content of console.log</lh>
+		<li>/api/addEvent
+			<form method="POST" onsubmit="postJson"><!-- action="/api/addEvent"  -->
 				<textarea name="events" rows="10" cols="50">
-				[{"thisIsATestEvent": {"id":1,"timestamp":1700000000,"email":"test@example.com"}}]
+				{ "bob": { "one": 1, "two": 2} }
 			  </textarea>
 				<br>
 				<button>addEvent</button>
 			</form>
-
-			<a href="/api/updateSnap">updateSnap this needs to be a form with post</a>
 		</li>
 	</ol>
 	//you can turn the snap and events into iframes with scrollbars if you would like.
-
-
-	<h2>format of data</h2>
-	<pre>
-	1. The db is just a loooong array of events.
-
-	2. Each event has the form
-	```js
-	{ 
-		postIdenfitifier1: {prop: "with primitive data" },
-	  postIdenfitifier1: {prop2: 42 },
-	}
-	```
-
-	3. a snap is a Object.assignAssign() of all the events in the db, fifo.
-	```js
-  function Object.assignAssign(...objs) {
-		const result = {};
-		for (const obj of objs)
-			for (const [k,v] of Object.entries(obj)) {
-				Object.assign(result[k] ?? {}, v);
-				for (let k of result[k])
-					if (k === undefined)
-						delete result[k];
-			}
-		return result;
-	}
-	```
-  </pre>
 </body>
 
 </html>

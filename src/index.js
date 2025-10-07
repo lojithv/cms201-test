@@ -110,7 +110,7 @@ const SECURE_PATHS = {
 	"GET /admin": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
 	},
-	"POST /api/event": async function (req, env, ctx, user) {
+	"POST /api/addEvent": async function (req, env, ctx, user) {
 		const json = await req.json(); //todo see if we can't pass the entire request to the DO??
 		return await DB(env).addEvent(user, json);
 	},
