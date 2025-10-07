@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS events (
   }
 
   async initialize(env) {
-    const startState = await (await env.ASSETS.fetch("state.json")).json();
+    const startState = await (await env.ASSETS.fetch("data/state.json")).json();
     if (this.#startState?.lastEventId >= startState.lastEventId)
       return;
     this.#startState = this.#currentState = startState;
