@@ -171,8 +171,7 @@ function getEndpoint(req, PATHS) {
 }
 
 async function init(env) {
-	const { pages, snap, lastEventId } = await (await env.ASSETS.fetch("snap.json"))?.json() ?? {};
-	await DB(env).initialize(env, pages, snap, lastEventId);
+	await DB(env).initialize(env);
 	return {
 		origin: env.ORIGIN,
 		// backup: {
