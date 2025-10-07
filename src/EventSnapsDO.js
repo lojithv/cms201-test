@@ -1,8 +1,21 @@
 import { DurableObject } from "cloudflare:workers";
 
+
+// ObjectAssignAssign({alice: {}, bob: {one: 1, two: 2}}, {bob: {two: 4}})
+// => { alice: {}, bob: {one: 1, two: 4} } // note that the bob.one was left intact
+function ObjectAssignAssign(...objs) {
+  const result = {};
+  for (const obj of objs)
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] ??= {};
+      for (const innerKey of value)
+        result[key][innerKey] = Object.assign(result[key][innerKey] ?? {}, obj[key]);
+    }
+  return result;
+}
+
 export class EventsSnaps extends DurableObject {
 
-  #startState;
   #currentState;
 
   constructor(ctx, env) {
@@ -20,10 +33,14 @@ CREATE TABLE IF NOT EXISTS events (
 
   async initialize(env) {
     const startState = await (await env.ASSETS.fetch("snap.json")).json();
-    if (this.#startState?.lastEventId >= startState.lastEventId)
+    if (this.#currentState?.lastEventId >= startState.lastEventId)
       return;
-    this.#currentState = this.#startState = startState;
-    this.sql.exec(`DELETE FROM events WHERE id <= ?`, startState.lastEventId);
+    this.#currentState = startState;
+    this.sql.exec(`DELETE FROM events WHERE id <= ?`, startState.lastEventId); //todo unsafe
+    const events = this.getEvents().map(e => e.json);
+    ObjectAssignAssign(this.#currentState.snap, ...events);
+
+    //todo make unsafe safer
     //todo how can we make this safer? I am worried about problems with the id being lower or something
     //todo should we use both timestamp and id? 
     //If we then get some events with the same event id, but different timestamp, we have an error point.
@@ -32,10 +49,6 @@ CREATE TABLE IF NOT EXISTS events (
   }
 
   addEvent(email, json) {
-    addEventAndReturnState(email, json);
-  }
-
-  addEventAndReturnState(email, json) {
     if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/.test(email))
       throw "invalid email: " + email;
     this.sql.exec(`INSERT INTO events (email, json) VALUES (?, ?)`, email, JSON.stringify(json));
@@ -55,8 +68,8 @@ CREATE TABLE IF NOT EXISTS events (
   }
 
   getSnap(name, cb) {
-    if(!name) return this.#currentState.snap;
-    if(!cb) throw new Error("You must provide a callback to process the snap in order to get a custom snap.");
+    if (!name) return this.#currentState.snap;
+    if (!cb) throw new Error("You must provide a callback to process the snap in order to get a custom snap.");
     this.#currentState.snaps ??= {};
     return this.#currentState.snaps[name] ??= cb(this.#currentState.snap);
   }
