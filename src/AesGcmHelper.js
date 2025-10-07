@@ -55,4 +55,18 @@ export class AesGcmHelper {
     const decrypted = await this.decrypt(encryptedStr);
     return JSON.parse(decrypted);
   }
+
+  async makeSecret(ttl, data = {}) {
+    return await this.encryptAsJSON({ ttl: new Date().getTime() + ttl, ...data });
+  }
+
+  async validateSecret(request) {
+    const secretToken = request.headers.get("Authorization")?.split("Bearer ")?.[1];
+    if (!secretToken)
+      throw "no Authorization Bearer token found";
+    const secret = await this.decryptAsJSON(secretToken);
+    if (!secret) throw "invalid token";
+    if (secret.ttl < new Date().getTime()) throw "token expired";
+    return secret;
+  }
 }
