@@ -4,24 +4,22 @@ export { EventsSnaps } from "./EventSnapsDO.js";
 
 const DB = env => env["EVENTS_SNAPS"].get(env["EVENTS_SNAPS"].idFromName("foo"));
 
-function cleanNotNull(obj) {
-	if (!(obj && typeof obj === "object")) return obj;
-	if (Array.isArray(obj)) return obj.map(clean);
-	const res = {};
-	for (const [k, v] of Object.entries(obj)) {
-		const cv = cleanNotNull(v);
-		if (cv != null)
-			res[k] = cv;
-	}
-	return res;
-}
-
 const UNSECURE_SAME_SITE_PATHS = {
 	"GET /api/snap": async function (req, env, ctx) {
 		return await DB(env).getSnap();
 	},
 	"GET /api/snap/notNull": async function (req, env, ctx) {
-		return await DB(env).getSnap("notNull", cleanNotNull);
+		return await DB(env).getSnap("notNull", function cleanNotNull(snap) {
+			if (!(snap && typeof snap === "object")) return snap;
+			if (Array.isArray(snap)) return snap.map(clean);
+			const res = {};
+			for (const [k, v] of Object.entries(snap)) {
+				const cv = cleanNotNull(v);
+				if (cv != null)
+					res[k] = cv;
+			}
+			return res;
+		});
 	},
 	"GET /api/uploaded-images": async function (req, env, ctx) {
 		const { image_server: { account_id, api_token } } = env.settings;
@@ -173,18 +171,6 @@ function getEndpoint(req, PATHS) {
 async function settings(env) {
 	return {
 		origin: env.ORIGIN,
-		// backup: {
-		// 	full: {
-		// 		time: Number(env.BACKUP_FULLTIME) * 24 * 3600000,
-		// 		events: env.BACKUP_FULLEVENTS,
-		// 	},
-		// 	partial: {
-		// 		time: Number(env.BACKUP_PARTIALTIME) * 24 * 3600000,
-		// 		events: env.BACKUP_PARTIALEVENTS,
-		// 	},
-		// 	to: env.BACKUP_EMAIL_TO,
-		// 	from: env.BACKUP_EMAIL_FROM,
-		// },
 		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
 		google: {
 			client_id: env.GOOGLE_ID,
