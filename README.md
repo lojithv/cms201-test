@@ -23,7 +23,7 @@ To run the worker locally, use the commands:
 2. go to `http://127.0.0.1:3033/ai/backup` (login using google oauth as prompted).
 3. in the FIRST terminal, you will see a log entry that looks like this: `deno run --allow-net --allow-read=data/ --allow-write=data/ scripts/workerEvents.js "http://127.0.0.1:3033" "1" "<secret>"`
 4. copy the command and run it in a SECOND terminal console in project root folder. This will then trigger the deno server script with correct paramaters.
-5. To debug the workerEvents.js script, you can add `--inspect-brk` after `deno run` in the command above, and then open `chrome://inspect` in a chrome browser to debug it.
+5. To debug the workerEvents.js script, you can add `--inspect-brk=127.0.0.1:9230` after `deno run` in the command above, and then open `chrome://inspect` in a chrome browser to debug it.
 6. To debug the worker code, and press [d] in the FIRST terminal console to open the inspector in a browser.
 7. It is not possible to run the workerEvents.js script on localhost yet.
 
@@ -37,19 +37,31 @@ Below is a receipe for how to replicate this project from scratch. It involves a
 => github username (and password?)
 => cloudflare username (and password?)
 => `${projectname}` Project name must match `/[a-z][a-z0-9]+/` regex.
+<!-- 
+input from user: 
+    ${projectname}
+    ${gmail}
+    ${githubusername}
+    ${cloudflareusername}
+check for conflicts, and then create accounts when needed.
+ -->
 2. Create a github repo named `${projectname}`.
 3. Create a cloudflare project named `${projectname}`.
 4. Create a console.cloud.google.com project named `${projectname}`.
 5. Set up an oauth service. 
     1. select the project, go to "APIs & Services" > "OAuth consent screen". 
-    2. Select "External", name: `"${projectname}$ oauth client"`, user support: `gmail`, developer contact: `gmail`, and save. 
+    2. Select "External", name: `"${projectname}$ oauth client"`, user support: `${gmail}`, developer contact: `${gmail}`, and save. 
     3. Then go to "Credentials" > "Create Credentials" > "OAuth Client ID". 
     4. Select "Web application", give it a name: `"${projectname} oauth client"`, and add the following authorized redirect URIs:
-        - `https://<projectname>.workers.dev/auth/callback`
+        - `https://${projectname}$.workers.dev/auth/callback`
         - `http://localhost:3033/api/auth/callback`
         - `http://127.0.0.1:3033/api/auth/callback`
 => google auth client id 
 => google auth secret
+
+<!-- 
+at this point, should we make the .dev.vars file?? In one place.
+ -->
 
 6. Create and connect the cloudflare project to the github repo.
     1. Go to the dash.cloudflare.com
@@ -72,7 +84,7 @@ Below is a receipe for how to replicate this project from scratch. It involves a
     3. Name: `production`
     4. Click "Configure environment"
     5. Click "Add variable"
-        * Name: `DOMAIN`, => value: `<projectname>.workers.dev`
+        * Name: `DOMAIN`, => value: `${projectname}.workers.dev`
     6. Click "Save variables"
 8. Update Cloudflare enviroment variables:
     1. Go to dash.cloudflare.com
@@ -83,7 +95,7 @@ Below is a receipe for how to replicate this project from scratch. It involves a
         * Name: `OAUTH_CLIENT_SECRET`, `Secret`, => value: `google auth secret`
         * Name: `EMAIL`, `Text`, => value: `gmail`
         * Name: `PROJECT_NAME`, `Text`, => value: `${projectname}`
-        * Name: `DOMAIN`, `Text`, => value: `<projectname>.workers.dev`
+        * Name: `DOMAIN`, `Text`, => value: `${projectname}.workers.dev`
         * Name: `REPO`, `Text`, => value: `${githubusername}/${projectname}`
     4. Click "Save"
 
@@ -95,9 +107,79 @@ Below is a receipe for how to replicate this project from scratch. It involves a
 1. change the project name in `wrangler.jsonc` and `README.md` to `${projectname}`.
 2. commit the repo to github as a new repo with the name ${projectname}.
 2. Wait for 1min??
-3. fetch `https://<projectname>.workers.dev/startup`. Make sure that it returns the same state as in the snapshot.json inside make sure that it returns the same value as was in the `data` branch commit.
+3. fetch `https://${projectname}.workers.dev/startup`. Make sure that it returns the same state as in the snapshot.json inside make sure that it returns the same value as was in the `data` branch commit.
 
-## Github actions script
+## Data sync process (worker <=> github)
+
+1. Every day at 02:00 the worker triggers the `/api/backup` function. (admin users can also trigger it manually). 
+2. Worker sends Github the control and 3 things:
+    * the worker's **origin**.
+    * the last **lastEventId** in the durable object memory.
+    * an encrypted **secret**.
+3. Github verifies the `secret`.
+4. Github fetches all the events upto `lastEventId` from Worker.
+5. Github saves them as `/data/events/x_y.json` files. (merging with last file if small).
+6. Github creates `/public/snap.json`.
+7. Github commits the changes.
+8. Github sends worker success msg with `lastEventId` and updated `snap`.
+9. Worker updates its first key `snap` and deletes events upto `lastEventId`.
+
+**Startup**. When the data sync process runs and there are nothing saved in the Worker's durable object, then no events will be saved on Github and only the latest `/data/snap.json` will be returned.
+
+## Data structure
+
+**on Github**
+1. `/public/data/events/x_y.json` files. All the events between timestamps x and y. Break on size > 10mb. Format `[{id, timestamp, email, json}, ...]`.
+2. `/public/data/snap.json`. The last up-to-date version of the `{snap, lastEventId, pages}`. Snap is created using `Object.assignAssign` logic.
+
+**in Worker (durable object)**
+1. `events`. A list of all the events added to the repo. Format `[{id, timestamp, email, json}, ...]`. (in sqlite the json is stringified).
+2. `#currentState`. The last up-to-date version of the `{snap, lastEventId, pages}`.
+3. 
+
+## How to timetravel using Github data?
+
+The worker's memory limit is ~30mb. Hence, history and timetravel is done page by page in the browser.
+1. Browser fetches `/data/pages.json` from Worker => from Github `/data/pages.json`. I think that `/data/pages.json` and `/data/snap.json` should be placed in the public folder? If they are there, we can access them from within the worker.
+2. 
+
+
+1. Load list of pages from `/data/pages.json`.
+2. The x and y are timestamps. Find the `x_y` for that time.
+3. Load all *older* `/data/snapWithNull/x_y.json` files than x_y.
+4. merge them using Object.assignAssignWithNull into a `snap` json object.
+5. Then load all the `/data/events/x_y.json` and add them as events.
+6. You are ready to timetravel.
+7. Likely use case is *cherrypick* whole posts or single properties that you would like to "restore". Set them up as a new event, and push them to the worker `/api/add`. 
+
+## worker chron jobs
+
+1. `/api/backup` (secured)
+* can be triggered by an admin clicking a link.
+* is triggered by a cron job every day at 02:00.
+
+Purpose: make sure that the worker data is backed up.
+    1. if there is only one event, that means that no changes have been made, just return.
+    2. else, keep `varSnap` = snapshot of the state; and `varKey` = the event id with the last event added with a timestamp that is not now. Make sure that new Date().getTime() != last.timestamp.
+    3. Try to push the events between 2 and last event to github. This can take a looong time.
+    4. If this returns ok, then the body of the response should be the new `/data/snap.json` file.
+    5. If this `/data/snap.json` is exactly the same as the snap saved in memory, things is ok, then we change the first snap by system user and delete the snaps from the sqllite database that has the key lower than `varKey`.
+    6. make sure that the worker `ctx.waitUntil()` the fetch promise.
+
+* if at any time the workflow fails, then just return. This will make the worker just try to upgrade events and its snap state the next day.
+* send an ***ERROR*** email to the gmail account.
+
+## todo
+
+1. We have a key problem. We must use timestamp.id as the key number I think.
+2. worker functions for `/admin/backup` => make a json events file and send it as a workflow dispatch to github.
+3. worker function for `/api/data/xyz` => then read and reload the corresponding `/data/xyz` from github. Cache forever.
+4. make the .yml file for cron job on github. Here, we need to add some security meassures, the llm is good at adding this.
+5. set up history.html view. Just get the pages from `/data/pages.json`, and then load the snaps and events as needed.
+6. and then we need to make `/admin/startup`?
+7. cli script for automatic copying.
+
+
 
 1. `.github/workflows/worker-events.yml`. Receives input from the worker.
 
@@ -140,47 +222,3 @@ function Object.assignAssign(...objs) {
     2. the `<main>/data/events/` and `/data/snapWithNull/` folders are cleaned.
     3. the  `<main>/data/snap.json` and `<main>/data/pages.json` file is updated. 
     This will leave a separate commit trace in the repo.
-
-* principles for worker:
-    1. `/data/snap.json` is the most up-to-date version of the snap.
-    2. `/data/events/` contains *all* the events split into pages of 25mb.
-    3. `/data/snapWithNull/` contains pages of snapshots *matching* the event pages.
-    4. new events can be pushed to `.github/workflows/worker-events.yml`.
-
-* examples of worker interaction:
-    1. Startup? fetch `/data/snap.json` and set its content as `snap` the first entry in the DO. User is system. id and timestamp is default. Then DO's `this.active = true`.
-    2. Recreate history? The worker is limited to 50mb of working memory. So history must be viewed in pages in the browser.
-        1. Load list of pages from `/data/pages.json`.
-        2. The x and y are timestamps. Find the `x_y` for that time.
-        3. Load all *older* `/data/snapWithNull/x_y.json` files than x_y.
-        4. merge them using Object.assignAssignWithNull into a `snap` json object.
-        5. Then load all the `/data/events/x_y.json` and add them as events.
-        6. You are ready to timetravel.
-        7. Likely use case is *cherrypick* whole posts or single properties that you would like to "restore". Set them up as a new event, and push them to the worker `/api/add`. 
-
-## worker chron jobs
-
-1. `/api/backup` (secured)
-* can be triggered by an admin clicking a link.
-* is triggered by a cron job every day at 02:00.
-
-Purpose: make sure that the worker data is backed up.
-    1. if there is only one event, that means that no changes have been made, just return.
-    2. else, keep `varSnap` = snapshot of the state; and `varKey` = the event id with the last event added with a timestamp that is not now. Make sure that new Date().getTime() != last.timestamp.
-    3. Try to push the events between 2 and last event to github. This can take a looong time.
-    4. If this returns ok, then the body of the response should be the new `/data/snap.json` file.
-    5. If this `/data/snap.json` is exactly the same as the snap saved in memory, things is ok, then we change the first snap by system user and delete the snaps from the sqllite database that has the key lower than `varKey`.
-    6. make sure that the worker `ctx.waitUntil()` the fetch promise.
-
-* if at any time the workflow fails, then just return. This will make the worker just try to upgrade events and its snap state the next day.
-* send an ***ERROR*** email to the gmail account.
-
-## todo
-
-1. We have a key problem. We must use timestamp.id as the key number I think.
-2. worker functions for `/admin/backup` => make a json events file and send it as a workflow dispatch to github.
-3. worker function for `/api/data/xyz` => then read and reload the corresponding `/data/xyz` from github. Cache forever.
-4. make the .yml file for cron job on github. Here, we need to add some security meassures, the llm is good at adding this.
-5. set up history.html view. Just get the pages from `/data/pages.json`, and then load the snaps and events as needed.
-6. and then we need to make `/admin/startup`?
-7. cli script for automatic copying.

@@ -110,11 +110,11 @@ const GITHUB_SECURE_PATHS = {
 		const id = Number(req.url.pathname.split("/")[3]) || 1;
 		return await DB(env).getEventsOlderThan(id);
 	},
-	"POST /api/cleanUpEventsAndSnap": async function (req, env) {
-		const id = Number(req.url.pathname.split("/")[3]) || 1;
-		const newSnap = await req.json();
-		return await DB(env).cleanUpEventsAndSnap(id, newSnap);
-	}
+	// "POST /api/cleanUpEventsAndSnap": async function (req, env) {
+	// 	const id = Number(req.url.pathname.split("/")[3]) || 1;
+	// 	const newSnap = await req.json();
+	// 	return await DB(env).cleanUpEventsAndSnap(id, newSnap);
+	// }
 };
 
 const SECURE_PATHS = {
@@ -125,16 +125,16 @@ const SECURE_PATHS = {
 		const json = await req.json();
 		return await DB(env).addEvent(user, json);
 	},
-	"POST /api/requestRollback": async function (req, env, ctx, user) {
-		const newEvents = await req.json();
-		await DB(env).requestRollback(newEvents, req.url.origin, env.settings);
-		return "ok. rollback requested."
-	},
-	"GET /api/confirmRollback": async function (req, env, ctx, user) {
-		const id = req.url.searchParams.get("id");
-		await DB(env).confirmRollback(id, req.url.origin, env.settings);
-		return "ok. rollback executed.";
-	},
+	// "POST /api/requestRollback": async function (req, env, ctx, user) {
+	// 	const newEvents = await req.json();
+	// 	await DB(env).requestRollback(newEvents, req.url.origin, env.settings);
+	// 	return "ok. rollback requested."
+	// },
+	// "GET /api/confirmRollback": async function (req, env, ctx, user) {
+	// 	const id = req.url.searchParams.get("id");
+	// 	await DB(env).confirmRollback(id, req.url.origin, env.settings);
+	// 	return "ok. rollback executed.";
+	// },
 	"GET /api/backup": async function (req, env, ctx, user) {
 		const body = {
 			secret: await makeGithubSecret(env.settings.github.coder, env.settings.github.ttl),
@@ -255,7 +255,9 @@ function getEndpoint(req, PATHS) {
 			return PATHS[key];
 }
 
-async function parseSettings(env) {
+async function init(env) {
+	const {pages, snap, lastEventId} = await (await env.ASSETS.fetch("snap.json"))?.json() ?? {};
+	await DB(env).initialize(env, pages, snap, lastEventId);
 	return {
 		origin: env.ORIGIN,
 		// backup: {
@@ -299,7 +301,8 @@ function getCookie(request, name) {
 
 async function onFetch(request, env, ctx) {
 	try {
-		env.settings ??= await parseSettings(env);
+		env.settings ??= await init(env); // (ctx?/env?).blockConcurrencyWhile() //todo add this!
+
 		Object.defineProperty(request, "url", { value: new URL(request.url) });
 		let endPoint = getEndpoint(request, UNSECURE_PATHS);
 		if (!endPoint) {  //validate that checking CORS manually for api endpoints like this is ok
@@ -340,7 +343,7 @@ async function onFetch(request, env, ctx) {
 }
 
 async function onSchedule(controller, env, ctx) {
-	env.settings ??= parseSettings(env);
+	env.settings ??= init(env);
 	await SECURE_PATHS["GET /api/backup"](undefined, env, ctx);
 }
 
