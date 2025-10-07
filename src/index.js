@@ -4,13 +4,24 @@ export { EventsSnaps } from "./EventSnapsDO.js";
 
 const DB = env => env["EVENTS_SNAPS"].get(env["EVENTS_SNAPS"].idFromName("foo"));
 
+function cleanNotNull(obj) {
+	if (!(obj && typeof obj === "object")) return obj;
+	if (Array.isArray(obj)) return obj.map(clean);
+	const res = {};
+	for (const [k, v] of Object.entries(obj)) {
+		const cv = clean(v);
+		if (cv != null)
+			res[k] = cv;
+	}
+	return res;
+}
+
 const UNSECURE_SAME_SITE_PATHS = {
-	"GET /api/events": async function (req, env, ctx) {
-		return await DB(env).getEvents();
-	},
 	"GET /api/snap": async function (req, env, ctx) {
-		const name = req.url.searchParams.get("name");
-		return await DB(env).getSnap(name);
+		return await DB(env).getSnap();
+	},
+	"GET /api/snap/notNull": async function (req, env, ctx) {
+		return await DB(env).getSnap("notNull", cleanNotNull);
 	},
 	"GET /api/uploaded-images": async function (req, env, ctx) {
 		const { image_server: { account_id, api_token } } = env.settings;
@@ -93,23 +104,24 @@ const GITHUB_SECURE_PATHS = {
 };
 
 const SECURE_PATHS = {
+	"GET /api/events": async function (req, env, ctx) {
+		return await DB(env).getEvents();
+	},
 	"GET /admin": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
 	},
 	"POST /api/event": async function (req, env, ctx, user) {
-		const json = await req.json();
+		const json = await req.json(); //todo see if we can't pass the entire request to the DO??
 		return await DB(env).addEvent(user, json);
 	},
 	"GET /api/backup": async function (req, env, ctx, user) {
 		const body = {
-			secret: await env.settings.github.coder.makeSecret(env.settings.github.ttl),
-			lastEventId: await DB(env).getLastEventId() || 1,
+			secret: await env.settings.github.coder.makeSecret(env.settings.github.ttl)
 		};
+		// --inspect-brk=127.0.0.1:9230\
 		console.log(`deno run \
-			--allow-net --allow-read=data/ --allow-write=data/ --inspect-brk=127.0.0.1:9230\
-			 scripts/workerEvents.js\
-			 "${env.settings.origin}" "${body.lastEventId}" \
-			 "${body.secret}"`);
+			--allow-net --allow-read=data/ --allow-write=data/ \
+			 scripts/workerEvents.js "${env.settings.origin}" "${body.secret}"`);
 		// const res = await fetch(env.settings.github.workflow, {
 		// 	method: 'POST',
 		// 	headers: {
