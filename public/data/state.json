@@ -6,7 +6,8 @@
       "two": "two"
     },
     "bob": {
-      "title": "Test"
+      "title": "Test",
+      "one": null
     }
   },
   "pages": [

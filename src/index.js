@@ -9,7 +9,7 @@ function cleanNotNull(obj) {
 	if (Array.isArray(obj)) return obj.map(clean);
 	const res = {};
 	for (const [k, v] of Object.entries(obj)) {
-		const cv = clean(v);
+		const cv = cleanNotNull(v);
 		if (cv != null)
 			res[k] = cv;
 	}
