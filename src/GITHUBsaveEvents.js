@@ -20,12 +20,9 @@ async function readPages(directory) {
 async function readLastFile(filename) {
   const gzipFileContent = await Deno.readFile(filename);
   const txt = await gunzipToString(gzipFileContent);
-  return {
-    filename,
-    events: JSON.parse(txt),
-    size: mostUptodateFile.size,
-    txt
-  };
+  const events = JSON.parse(txt);
+  const size = mostUptodateFile.size;
+  return { filename, events, size, txt };
 }
 
 function mergeJsonEventFiles(one, two) {
