@@ -1,4 +1,4 @@
-import { ObjectAssignAssign, gunzipToString, gzipString } from "./utils.js";
+import { ObjectAssignAssign, gunzipToString, gzipString } from "./tools.js";
 
 async function readInput(url, secret) {
   const txt = await (await fetch(url, { headers: { 'Authorization': `Bearer ${secret}` } })).text();
@@ -9,10 +9,9 @@ async function readInput(url, secret) {
 
 async function readPages(directory) {
   const pages = [];
-  const directory = await Deno.readDir(directory);
-  for await (const unit of directory)
-    if (unit.isFile && unit.name.endsWith('.json.gz'))
-      pages.push(unit.name.split(".")[0]);
+  for await (const { isFile, name } of await Deno.readDir(directory))
+    if (isFile && name.endsWith('.json.gz'))
+      pages.push(name.split(".")[0]);
   pages.sort();
   return pages;
 }
