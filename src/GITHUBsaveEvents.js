@@ -7,7 +7,20 @@ async function readInput(url, secret) {
   return { events, size, txt };
 }
 
-async function readLastFile(path) {
+async function getLastGzipFileName(directory) {
+  const directory = await Deno.readDir(directory);
+  let lastFileName;
+  for await (const unit of directory)
+    if (unit.isFile && unit.name.endsWith('.gz'))
+      if (!lastFileName || unit.name > lastFileName.name)
+        lastFileName = unit.name;
+  return directory + lastFileName;
+}
+
+async function readLastFile(directory) {
+  const lastFileName = await getLastGzipFileName(directory);
+  //todo this should be a zip file, and so upack it.
+
   const txt = await Deno.readTextFile(path);
   const size = new TextEncoder().encode(txt).length;
   const events = JSON.parse(txt);
@@ -27,7 +40,7 @@ async function main(origin, lastEventId, secret) {
 
   if (input.size < 10_000_000) {
     const lastFileName = serverState.pages.at(-1) + '.json';
-    const lastFile = await readLastFile('public/data/events/' + lastFileName);
+    const lastFile = await readLastFile('public/data/events/');
     console.log("4.", lastFile.txt);
     if ((lastFile.size + input.size) < 10_000_000) {
       input.events = [...lastFile.events, ...input.events];
