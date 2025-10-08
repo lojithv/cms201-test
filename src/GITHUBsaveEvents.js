@@ -7,14 +7,17 @@ async function readInput(url, secret) {
   return { events, size, txt };
 }
 
-async function readLastFile(directory) {
+async function readPages(directory) {
+  const pages = [];
   const directory = await Deno.readDir(directory);
-  let mostUptodateFile;
   for await (const unit of directory)
-    if (unit.isFile && unit.name.endsWith('.gz'))
-      if (!mostUptodateFile || unit.name > mostUptodateFile.name)
-        mostUptodateFile = unit;
-  const filename = directory + mostUptodateFile.name;
+    if (unit.isFile && unit.name.endsWith('.json.gz'))
+      pages.push(unit.name.split(".")[0]);
+  pages.sort();
+  return pages;
+}
+
+async function readLastFile(filename) {
   const gzipFileContent = await Deno.readFile(filename);
   const txt = await gunzipToString(gzipFileContent);
   return {
@@ -25,49 +28,60 @@ async function readLastFile(directory) {
   };
 }
 
+function mergeJsonEventFiles(one, two) {
+  const events = [...two.events, ...one.events];
+  const txt = JSON.stringify(events);
+  const size = one.size + two.size;
+  return { events, txt, size };
+}
+
 async function main(origin, lastEventId, secret) {
-  const input = await readInput(`${origin}/api/events`, secret);
-  console.log("1.", input.txt);
-  if (!input.events.length)
-    return console.log("no new events, ending.");
+  let input;
+  try {
+    input = await readInput(`${origin}/api/events`, secret);
+    console.log("1. read input with events count: " + input.events.length);
+    if (!input.events.length)
+      return console.log("X. no new events.");
 
-  const serverState = JSON.parse(await Deno.readTextFile('public/data/state.json'));
-  console.log("2.", JSON.stringify(serverState));
+    serverState = JSON.parse(await Deno.readTextFile('public/data/state.json'));
+    console.log("2. read server state.");
+    const pages = await readPages('public/data/events/');
+    console.log("3. read pages.");
 
-  const ops = {};
-
-  if (input.size < 10_000_000) {
-    const lastFile = await readLastFile('public/data/events/');
-    console.log("4.", lastFile.txt);
-    if ((lastFile.size + input.size) < 10_000_000) {
-      input.events = [...lastFile.events, ...input.events];
-      input.txt = JSON.stringify(input.events);
-      input.size += lastFile.size;
-      ops['public/data/events/' + lastFile.filename] = null;
-      pages.pop();
-      console.log("5.", "new merged", input.txt);
-      console.log("6.", JSON.stringify(pages));
+    const ops = {};
+    if (input.size < 10_000_000) {
+      lastFile = await readLastFile('public/data/events/' + pages.at(-1) + ".json.gz");
+      console.log("4. read lastFile");
+      if ((lastFile.size + output.size) < 10_000_000) {
+        output = mergeJsonEventFiles(input, lastFile);
+        console.log("5. merged events with lastFile");
+        ops['public/data/events/' + lastFile.filename] = null;
+        pages.pop();
+      }
     }
+    output ??= { ...input };
+    const timestampName = `${output.events[0].timestamp}_${output.events.at(-1).timestamp}`;
+    pages.push(timestampName);
+    newState = {
+      lastEventId,
+      snap: ObjectAssignAssign([serverState.snap, ...output.events.map(e => e.json)]),
+      pages
+    };
+    ops['public/state.json'] = JSON.stringify(newState);
+    console.log("6. prepared new state.json.");
+
+    const newFilename = 'public/data/events/' + timestampName + '.json.gz';
+    ops[newFilename] = await gzipString(output.txt);
+    console.log("7. prepared " + newFilename);
+
+    await Deno.mkdir("data/events", { recursive: true });
+    await Promise.all(Object.entries(ops).map(([path, data]) =>
+      data ? Deno.writeTextFile(path, data) : Deno.remove(path)));
+    console.log("8. wrote files", origin, lastEventId);
+  } catch (err) {
+    if (input)
+      Deno.writeTextFile('data_invalid/' + new Date().getTime() + ".json", input.txt);
   }
-  const timestampName = `${input.events[0].timestamp}_${input.events.at(-1).timestamp}`;
-  input.filename = 'public/data/events/' + timestampName + '.json.gz';
-  input.gzip = await gzipString(input.txt);
-  pages.push(timestampName);
-
-  const newState = {
-    lastEventId,
-    snap: ObjectAssignAssign([serverState.snap, ...input.events.map(e => e.json)]),
-    pages
-  };
-  console.log("7.", JSON.stringify(newState));
-  
-  ops[input.filename] = input.gzip;
-  ops['public/state.json'] = JSON.stringify(newState);
-
-  await Deno.mkdir("data/events", { recursive: true });
-  await Promise.all(Object.entries(ops).map(([path, data]) =>
-    data ? Deno.writeTextFile(path, data) : Deno.remove(path)));
-  console.log("10. wrote files", origin, lastEventId);
 }
 
 main(...Deno.args);
