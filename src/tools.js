@@ -17,3 +17,14 @@ export async function gunzipToString(gzipBytes) {
   return new TextDecoder().decode(ab);
 }
 
+// ObjectAssignAssign({alice: {}, bob: {one: 1, two: 2}}, {bob: {two: 4}})
+// => { alice: {}, bob: {one: 1, two: 4} } // note that the bob.one was left intact
+export function ObjectAssignAssign(...objs) {
+  const res = {};
+  for (const obj of objs)
+    for (const [key, obj2] of Object.entries(obj))
+      for (let [key2, value] of Object.entries(obj2))
+        (res[key] ??= {})[key2] = value;
+  return res;
+}
+

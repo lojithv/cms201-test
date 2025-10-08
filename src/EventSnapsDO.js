@@ -1,15 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-
-// ObjectAssignAssign({alice: {}, bob: {one: 1, two: 2}}, {bob: {two: 4}})
-// => { alice: {}, bob: {one: 1, two: 4} } // note that the bob.one was left intact
-function ObjectAssignAssign(...objs) {
-  const res = {};
-  for (const obj of objs)
-    for (const [key, obj2] of Object.entries(obj))
-      for (let [key2, value] of Object.entries(obj2))
-        (res[key] ??= {})[key2] = value;
-  return res;
-}
+import { ObjectAssignAssign } from "./tools.js";
 
 export class EventsSnaps extends DurableObject {
 
