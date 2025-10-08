@@ -26,7 +26,6 @@ async function readLastFile(directory) {
 }
 
 async function main(origin, lastEventId, secret) {
-  //todo we trust that the /api/events will return to us an array of [] objects.
   const input = await readInput(`${origin}/api/events`, secret);
   console.log("1.", input.txt);
   if (!input.events.length)
