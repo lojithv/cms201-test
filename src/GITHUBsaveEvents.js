@@ -31,10 +31,11 @@ function mergeJsonEventFiles(one, two) {
   return { events, txt, size };
 }
 
-async function main(origin, lastEventId, secret) {
+async function main(origin, secret) {
   let input;
   try {
     input = await readInput(`${origin}/api/events`, secret);
+    const lastEvent = input.events.at(-1);
     console.log("1. read input with events count: " + input.events.length);
     if (!input.events.length)
       return console.log("X. no new events.");
@@ -59,7 +60,7 @@ async function main(origin, lastEventId, secret) {
     const timestampName = `${output.events[0].timestamp}_${output.events.at(-1).timestamp}`;
     pages.push(timestampName);
     newState = {
-      lastEventId,
+      lastEvent,
       snap: ObjectAssignAssign([serverState.snap, ...output.events.map(e => e.json)]),
       pages
     };
@@ -73,7 +74,7 @@ async function main(origin, lastEventId, secret) {
     await Deno.mkdir("data/events", { recursive: true });
     await Promise.all(Object.entries(ops).map(([path, data]) =>
       data ? Deno.writeTextFile(path, data) : Deno.remove(path)));
-    console.log("8. wrote files", origin, lastEventId);
+    console.log("8. wrote files", origin);
   } catch (err) {
     if (input)
       Deno.writeTextFile('data_invalid/' + new Date().getTime() + ".json", input.txt);
