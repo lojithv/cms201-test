@@ -11,10 +11,11 @@ export class EventsSnaps extends DurableObject {
     this.sql = this.ctx.storage.sql;
     this.sql.exec(`
 CREATE TABLE IF NOT EXISTS events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER AUTOINCREMENT,
   timestamp INTEGER DEFAULT (strftime('%s','now')),
-  email TEXT,
-  json TEXT
+  email TEXT NOT NULL,
+  json TEXT NOT NULL,
+  PRIMARY KEY(id, timestamp, email)
 );`);
     ctx.blockConcurrencyWhile(async () => {
       const res = await this.env.ASSETS.fetch(new URL("/data/state.json", "https://assets.local"));
