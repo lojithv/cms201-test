@@ -1,20 +1,4 @@
-function ObjectAssignAssign(objs) {
-  objs = objs.map(o => o.json);
-  const res = {};
-  for (let obj of objs)
-    for (let key in obj)
-      Object.assign(res[key] ?? {}, obj[key]);
-  return res;
-}
-
-async function readDirectoryWithoutJson(path) {
-  const pages = [];
-  for await (const entry of Deno.readDir(path))
-    if (entry.isFile && entry.name.endsWith('.json'))
-      pages.push(entry.name.slice(0, -5));
-  pages.sort();
-  return pages;
-}
+import { ObjectAssignAssign } from "./utils.js";
 
 async function readInput(url, secret) {
   const txt = await (await fetch(url, { headers: { 'Authorization': `Bearer ${secret}` } })).text();

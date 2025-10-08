@@ -119,7 +119,7 @@ const SECURE_PATHS = {
 		// --inspect-brk=127.0.0.1:9230\
 		console.log(`deno run \
 			--allow-net --allow-read=data/ --allow-write=data/ \
-			 scripts/workerEvents.js "${env.settings.origin}" "${body.secret}"`);
+			 src/githubSaveEvents.js "${env.settings.origin}" "${body.secret}"`);
 		// const res = await fetch(env.settings.github.workflow, {
 		// 	method: 'POST',
 		// 	headers: {
