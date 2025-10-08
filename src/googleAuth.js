@@ -56,6 +56,8 @@ export function getAuthGoogleUser(rawToken, settings) {
     return delete memory[rawToken];
   }
   return verifyJWTSignature(rawToken).then(payload => {
+    // if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/.test(payload?.email))
+    //   throw new Error("Invalid email in token from google?!?!");
     if (payload && validateToken(payload, settings))
       return memory[rawToken] = payload;
   });

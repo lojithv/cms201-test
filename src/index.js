@@ -109,7 +109,9 @@ const SECURE_PATHS = {
 		return env.ASSETS.fetch(req);
 	},
 	"POST /api/addEvent": async function (req, env, ctx, user) {
-		const json = await req.json(); //todo see if we can't pass the entire request to the DO??
+		const json = await req.json();
+		if (!json || typeof json !== "object" || !Object.keys(json).length)
+			throw new Error("You can only add a non-empty json object as event data.");
 		return await DB(env).addEvent(user, json);
 	},
 	"GET /api/backup": async function (req, env, ctx, user) {

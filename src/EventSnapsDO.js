@@ -48,8 +48,6 @@ CREATE TABLE IF NOT EXISTS events (
   }
 
   addEvent(email, json) {
-    if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/.test(email))
-      throw "invalid email: " + email;
     this.sql.exec(`INSERT INTO events (email, json) VALUES (?, ?)`, email, JSON.stringify(json));
     const newState = {
       lastEventId: this.sql.exec("SELECT * FROM events ORDER BY id DESC LIMIT 1").next().value?.id,
