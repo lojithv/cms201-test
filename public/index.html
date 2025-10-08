@@ -32,7 +32,7 @@
 
 		<lh>POST check content of console.log</lh>
 		<li>/api/addEvent
-			<form method="POST" onsubmit="postJson"><!-- action="/api/addEvent"  -->
+			<form method="POST" action="/api/addEvent" onsubmit="postJson(event)"><!--   -->
 				<textarea name="events" rows="10" cols="50">
 				{ "bob": { "one": 1, "two": 2} }
 			  </textarea>
