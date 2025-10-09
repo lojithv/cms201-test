@@ -96,7 +96,7 @@ const UNSECURE_PATHS = {
 };
 
 const GITHUB_SECURE_PATHS = {
-	"GET /api/events": async function (req, env) {
+	"GET /api/github/events": async function (req, env) {
 		return await DB(env).getEvents();
 	},
 };
@@ -211,6 +211,11 @@ async function onFetch(request, env, ctx) {
 			if (endPoint && !request.headers.get("Referer")?.startsWith(request.url.origin))
 				throw "CORS error: Referer not same site";
 		}									//validate end
+		if (!endPoint) {
+			endPoint = getEndpoint(request, GITHUB_SECURE_PATHS);
+			if (endPoint)
+				await env.settings.github.coder.validateSecret(request);
+		}
 		let user;
 		if (!endPoint) {
 			endPoint = getEndpoint(request, SECURE_PATHS);
@@ -222,11 +227,6 @@ async function onFetch(request, env, ctx) {
 				if (!user)
 					endPoint = UNSECURE_PATHS["GET /auth/login"];
 			}
-		}
-		if (!endPoint) {
-			endPoint = getEndpoint(request, GITHUB_SECURE_PATHS);
-			if (endPoint)
-				await env.settings.github.coder.validateSecret(request);
 		}
 		if (!endPoint)
 			throw "no endPoint found";
