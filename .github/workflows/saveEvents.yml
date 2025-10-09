@@ -41,7 +41,7 @@ jobs:
           
         run: |
           echo "Deno script starting (yml)..."
-          deno run --allow-read=public/data/ --allow-write=public/data/ src/GITHUBsaveEvents.js "$DOMAIN" "$WORKER_LAST_EVENT_ID" "$WORKER_SECRET"
+          deno run --allow-read=public/data/ --allow-write=public/data/ src/GITHUBsaveEvents.js "$DOMAIN" "$WORKER_SECRET"
           echo "✅ Deno script completed (yml)."
 
       - name: Commit and push to repository
