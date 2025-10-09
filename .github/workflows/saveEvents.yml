@@ -7,10 +7,6 @@ on:
         description: 'text secret to authenticate the request'
         required: true
         type: string
-      lastEventId:
-        description: 'the last event id number that the worker has, to avoid duplicates'
-        required: true
-        type: number  ##todo check if number works here
 
 permissions:
   contents: write
