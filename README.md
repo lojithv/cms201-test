@@ -31,6 +31,27 @@ To run the worker locally, use the commands:
 
 Below is a receipe for how to replicate this project from scratch. It involves a mix of manual steps and scripts. The goal is to have a fully working Cloudflare Worker project that uses Google OAuth for authentication, GitHub for version control, and Cloudflare Pages for deployment. The project also includes a system for tracking changes and creating snapshots of data.
 
+## .dev.vars
+
+```
+ORIGIN="http://127.0.0.1:3033"
+OAUTH_USERS="orstavik77@gmail.com;jeramydaradal@gmail.com"
+GOOGLE_ID="12345.apps.googleusercontent.com"
+GOOGLE_SECRET="GOCSPX-12345"
+GOOGLE_REDIRECT="http://127.0.0.1:3033/auth/callback"
+# GOOGLE_REDIRECT="<cloudflare link>/auth/callback"
+
+IMAGE_SERVER_ACCOUNT_ID="12345"
+IMAGE_SERVER_API_TOKEN="12345"
+
+GITHUB_PASSPHRASE="hello sunshine"
+GITHUB_REPO="orstavik/cms201"
+GITHUB_WORKFLOW="https://api.github.com/repos/<reponame>/actions/workflows/saveEvents/dispatches"
+GITHUB_PAT="github_pat_12345"
+GITHUB_TTL="300" 
+# GITHUB_TTL="5"00" # in prod 5 minutes, the allowed delay time for the cloudflare secret given github.
+```
+
 ## 1. Manual steps
 1. Create a **gmail account**, **github account**, **cloudflare account** for the project.
 => gmail and password
