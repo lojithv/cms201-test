@@ -96,7 +96,7 @@ const UNSECURE_PATHS = {
 };
 
 const GITHUB_SECURE_PATHS = {
-	"GET /api/events": async function (req, env) {
+	"GET /api/github/events": async function (req, env) {
 		return await DB(env).getEvents();
 	},
 };

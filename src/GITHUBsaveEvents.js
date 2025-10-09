@@ -34,7 +34,7 @@ function mergeJsonEventFiles(one, two) {
 async function main(origin, secret) {
   let input;
   try {
-    input = await readInput(origin + "/api/events", secret);
+    input = await readInput(origin + "/api/github/events", secret);
     const lastEvent = input.events.at(-1);
     console.log("1. read input with events count: " + input.events.length);
     if (!input.events.length)
