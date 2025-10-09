@@ -3,45 +3,17 @@
 
 <body>
 
-	<script>
-		async function postJson(e) {
-			event.preventDefault();
-			const form = e.target;
-			const body = form.querySelector('textarea').value.trim();
-			const res = await fetch(form.action, { method: "POST", headers: { 'Content-Type': 'application/json' }, body });
-			const text = await res.text();
-			console.log(res.status, text);
-		}
-	</script>
+	<lh>GET manual</lh>
+	<li><a href="/auth/login">Log in (click to test)</a></li>
+	<li><a href="/auth/logout">Log out (click to test)</a></li>
+	<lh>Admin endpoints for convenience</lh>
+	<li><a href="/admin" target="_blank">/admin</a></li>
+	<li><a href="/auth/checkLogin" target="_blank">check login</a></li>
 
-	<ol>
-		<lh>GET manual</lh>
-		<li><a href="/auth/login">Log in (click to test)</a></li>
-		<li><a href="/auth/logout">Log out (click to test)</a></li>
-		<li><a href="/auth/checkLogin" target="_blank">check login</a></li>
+	<lh>GET check content of new window</lh>
+	<li><a href="/api/snap" target="_blank">/api/snap/</a></li>
+	<li><a href="/api/snap/notNull" target="_blank">/api/snap/full</a></li>
 
-		<lh>GET check content of new window</lh>
-		<li><a href="/api/snap" target="_blank">/api/snap/</a></li>
-		<li><a href="/api/snap/notNull" target="_blank">/api/snap/full</a></li>
-
-		<li><a href="/api/events" target="_blank">/api/events</a></li>
-		<li><a href="/api/events/2" target="_blank">/api/events/2</a></li>
-
-		<lh>GET check content of email and new window</lh>
-		<li><a href="/api/backup" target="_blank">backup</a></li>
-
-		<lh>POST check content of console.log</lh>
-		<li>/api/addEvent
-			<form method="POST" action="/api/addEvent" onsubmit="postJson(event)"><!--   -->
-				<textarea name="events" rows="10" cols="50">
-				{ "bob": { "one": 1, "two": 2} }
-			  </textarea>
-				<br>
-				<button>addEvent</button>
-			</form>
-		</li>
-	</ol>
-	//you can turn the snap and events into iframes with scrollbars if you would like.
 </body>
 
 </html>
