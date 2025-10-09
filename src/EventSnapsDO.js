@@ -12,7 +12,7 @@ export class EventsSnaps extends DurableObject {
     this.sql.exec(`
 CREATE TABLE IF NOT EXISTS events (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
-  timestamp INTEGER NOT NULL DEFAULT unixepoch('now'),
+  timestamp INTEGER NOT NULL DEFAULT (unixepoch('now')),
   email     TEXT NOT NULL,
   json      TEXT NOT NULL
 );`);
