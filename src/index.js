@@ -4,28 +4,22 @@ export { EventsSnaps } from "./EventSnapsDO.js";
 
 const DB = env => env["EVENTS_SNAPS"].get(env["EVENTS_SNAPS"].idFromName("foo"));
 
-async function validateGithubSecret(req, coder) {
-	const secretToken = req.headers.get("Authorization")?.split("Bearer ")?.[1];
-	if (!secretToken)
-		throw "no Authorization Bearer token found";
-	const secret = await coder.decryptAsJSON(secretToken);
-	if (!secret) throw "invalid token";
-	if (secret.ttl < new Date().getTime()) throw "token expired";
-}
-
-async function makeGithubSecret(coder, ttl) {
-	return await coder.encryptAsJSON({
-		ttl: new Date().getTime() + ttl,
-	});
-}
-
 const UNSECURE_SAME_SITE_PATHS = {
-	"GET /api/events": async function (req, env, ctx) {
-		return await DB(env).getEvents();
-	},
 	"GET /api/snap": async function (req, env, ctx) {
-		const name = req.url.searchParams.get("name");
-		return await DB(env).getSnap(name);
+		return await DB(env).getSnap();
+	},
+	"GET /api/snap/notNull": async function (req, env, ctx) {
+		return await DB(env).getSnap("notNull", function cleanNotNull(snap) {
+			if (!(snap && typeof snap === "object")) return snap;
+			if (Array.isArray(snap)) return snap.map(clean);
+			const res = {};
+			for (const [k, v] of Object.entries(snap)) {
+				const cv = cleanNotNull(v);
+				if (cv != null)
+					res[k] = cv;
+			}
+			return res;
+		});
 	},
 	"GET /api/uploaded-images": async function (req, env, ctx) {
 		const { image_server: { account_id, api_token } } = env.settings;
@@ -51,10 +45,6 @@ const UNSECURE_SAME_SITE_PATHS = {
 };
 
 const UNSECURE_PATHS = {
-	// added this v
-	// "GET /": function (req, env, ctx) {
-	// 	return env.ASSETS.fetch(req);
-	// },
 	"GET /auth/login": function (req, env, ctx) {
 		const { client_id, redirect_uri } = env.settings.google;
 		const state = req.url.pathname == "/auth/login" ? "/" :
@@ -106,45 +96,32 @@ const UNSECURE_PATHS = {
 };
 
 const GITHUB_SECURE_PATHS = {
-	"GET /api/eventsOlderThan": async function (req, env) {
-		const id = Number(req.url.pathname.split("/")[3]) || 1;
-		return await DB(env).getEventsOlderThan(id);
+	"GET /api/events": async function (req, env) {
+		return await DB(env).getEvents();
 	},
-	"POST /api/cleanUpEventsAndSnap": async function (req, env) {
-		const id = Number(req.url.pathname.split("/")[3]) || 1;
-		const newSnap = await req.json();
-		return await DB(env).cleanUpEventsAndSnap(id, newSnap);
-	}
 };
 
 const SECURE_PATHS = {
+	"GET /api/events": async function (req, env, ctx) {
+		return await DB(env).getEvents();
+	},
 	"GET /admin": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
 	},
-	"POST /api/event": async function (req, env, ctx, user) {
+	"POST /api/addEvent": async function (req, env, ctx, user) {
 		const json = await req.json();
+		if (!json || typeof json !== "object" || !Object.keys(json).length)
+			throw new Error("You can only add a non-empty json object as event data.");
 		return await DB(env).addEvent(user, json);
-	},
-	"POST /api/requestRollback": async function (req, env, ctx, user) {
-		const newEvents = await req.json();
-		await DB(env).requestRollback(newEvents, req.url.origin, env.settings);
-		return "ok. rollback requested."
-	},
-	"GET /api/confirmRollback": async function (req, env, ctx, user) {
-		const id = req.url.searchParams.get("id");
-		await DB(env).confirmRollback(id, req.url.origin, env.settings);
-		return "ok. rollback executed.";
 	},
 	"GET /api/backup": async function (req, env, ctx, user) {
 		const body = {
-			secret: await makeGithubSecret(env.settings.github.coder, env.settings.github.ttl),
-			lastEventId: await DB(env).getLastEventId() || 1,
+			secret: await env.settings.github.coder.makeSecret(env.settings.github.ttl)
 		};
+		// --inspect-brk=127.0.0.1:9230\
 		console.log(`deno run \
-			--allow-net --allow-read=data/ --allow-write=data/ --inspect-brk=127.0.0.1:9230\
-			 scripts/workerEvents.js\
-			 "${env.settings.origin}" "${body.lastEventId}" \
-			 "${body.secret}"`);
+			--allow-net --allow-read=public/data/ --allow-write=public/data/ \
+			 src/githubSaveEvents.js "${env.settings.origin}" "${body.secret}"`);
 		// const res = await fetch(env.settings.github.workflow, {
 		// 	method: 'POST',
 		// 	headers: {
@@ -160,68 +137,6 @@ const SECURE_PATHS = {
 		// 	throw new Error("Error triggering backup workflow: " + await res.text());
 		return "ok. backup initiated."
 	},
-	// "GET /api/backup": async function (req, env, ctx, user) {
-	// 	const db = DB(env);
-	// 	const events = await db.getEventsSinceLastBackup();
-	// 	if (!events || events.length <= 1) return "ok. no changes to backup.";
-	// 	const eventsToBackup = events.slice(1);
-	// 	const lastEvent = eventsToBackup[eventsToBackup.length - 1];
-	// 	if (lastEvent.timestamp === new Date().getTime()) return "ok. waiting for timestamp difference.";
-	// 	const firstEvent = eventsToBackup[0];
-	// 	const fileName = `${firstEvent.timestamp}_${firstEvent.id}_${lastEvent.timestamp}_${lastEvent.id}.json`;
-
-	// 	// Use your own repository where you have access
-	// 	const targetRepo = env.REPO || 'calebdaradal/cms555';
-	// 	console.log("Dispatching to repo:", targetRepo);
-	// 	console.log("Using GitHub PAT:", env.GITHUB_PAT ? `${env.GITHUB_PAT.substring(0, 10)}...` : 'NOT SET');
-	// 	console.log("File path:", `data/events/${fileName}`);
-
-	// 	const requestBody = {
-	// 		ref: 'main',
-	// 		inputs: {
-	// 			file_path: `data/events/${fileName}`,
-	// 			file_content: JSON.stringify(eventsToBackup, null, 2)
-	// 		}
-	// 	};
-	// 	console.log("Request body:", JSON.stringify(requestBody, null, 2));
-
-	// 	const response = await fetch(
-	// 		`https://api.github.com/repos/${targetRepo}/actions/workflows/worker-events.yml/dispatches`,
-	// 		{
-	// 			method: 'POST',
-	// 			headers: {
-	// 				'Authorization': `Bearer ${env.GITHUB_PAT}`,
-	// 				'Accept': 'application/vnd.github+json',
-	// 				'Content-Type': 'application/json',
-	// 				'X-GitHub-Api-Version': '2022-11-28',
-	// 				'User-Agent': 'cms201-backup-worker/1.0'
-	// 			},
-	// 			body: JSON.stringify(requestBody)
-	// 		}
-	// 	);
-	// 	//this is always 204, we need to poll
-	// 	console.log("Response status:", response.status);
-	// 	console.log("Response headers:", Object.fromEntries(response.headers.entries()));
-
-	// 	if (!response.ok) {
-	// 		const errorText = await response.text();
-	// 		console.log("Error response body:", errorText);
-	// 		throw new Error(`GitHub workflow dispatch failed: ${response.status} - ${errorText}`);
-	// 	}
-
-	// 	ctx.waitUntil((async () => {
-	// 		try {
-	// 			//todo here we need to delete events from the db that are older than the last successful backup
-	// 			//todo also, we need to poll for new /data/pages.json and /data/snaps.json to see if the events we have are backed up.
-	// 			await new Promise(resolve => setTimeout(resolve, 5000));
-	// 			await db.cleanupEventsBeforeKey(lastEvent.id);
-	// 			await db.markSuccessfulGithubBackup(lastEvent.id);
-	// 		} catch (error) {
-	// 			await db.markFailedGithubBackup(error, lastEvent.id);
-	// 		}
-	// 	})());
-	// 	return "ok. backup initiated.";
-	// },
 	"GET /auth/checkLogin": async function (req, env, ctx, user) {
 		return "ok. Already authenticated.";
 	},
@@ -255,21 +170,9 @@ function getEndpoint(req, PATHS) {
 			return PATHS[key];
 }
 
-async function parseSettings(env) {
+async function settings(env) {
 	return {
 		origin: env.ORIGIN,
-		// backup: {
-		// 	full: {
-		// 		time: Number(env.BACKUP_FULLTIME) * 24 * 3600000,
-		// 		events: env.BACKUP_FULLEVENTS,
-		// 	},
-		// 	partial: {
-		// 		time: Number(env.BACKUP_PARTIALTIME) * 24 * 3600000,
-		// 		events: env.BACKUP_PARTIALEVENTS,
-		// 	},
-		// 	to: env.BACKUP_EMAIL_TO,
-		// 	from: env.BACKUP_EMAIL_FROM,
-		// },
 		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
 		google: {
 			client_id: env.GOOGLE_ID,
@@ -299,7 +202,8 @@ function getCookie(request, name) {
 
 async function onFetch(request, env, ctx) {
 	try {
-		env.settings ??= await parseSettings(env);
+		env.settings ??= await settings(env);
+
 		Object.defineProperty(request, "url", { value: new URL(request.url) });
 		let endPoint = getEndpoint(request, UNSECURE_PATHS);
 		if (!endPoint) {  //validate that checking CORS manually for api endpoints like this is ok
@@ -322,7 +226,7 @@ async function onFetch(request, env, ctx) {
 		if (!endPoint) {
 			endPoint = getEndpoint(request, GITHUB_SECURE_PATHS);
 			if (endPoint)
-				await validateGithubSecret(request, env.settings.github.coder);
+				await env.settings.github.coder.validateSecret(request);
 		}
 		if (!endPoint)
 			throw "no endPoint found";
@@ -340,7 +244,7 @@ async function onFetch(request, env, ctx) {
 }
 
 async function onSchedule(controller, env, ctx) {
-	env.settings ??= parseSettings(env);
+	env.settings ??= settings(env);
 	await SECURE_PATHS["GET /api/backup"](undefined, env, ctx);
 }
 
