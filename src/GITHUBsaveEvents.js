@@ -47,7 +47,7 @@ async function main(origin, secret) {
     let output;
     const ops = {};
     if (input.size < 4_000_000) {  //4mb gzip => 25mb json?? hopefully it wont break if we unpack in the worker.
-      const lastFile = await readLastFile(pages.at(-1));
+      const lastFile = await readLastFile('public/data/events/' + pages.at(-1));
       console.log("4. read lastFile");
       if ((lastFile.size + input.size) < 4_000_000) {
         output = mergeJsonEventFiles(input, lastFile);
