@@ -20,7 +20,7 @@ async function readLastFile(filename) {
   const gzipFileContent = await Deno.readFile(filename);
   const txt = await gunzipToString(gzipFileContent);
   const events = JSON.parse(txt);
-  const size = mostUptodateFile.size;
+  const size = gzipFileContent.length;
   return { filename, events, size, txt };
 }
 
@@ -40,16 +40,17 @@ async function main(origin, secret) {
     if (!input.events.length)
       return console.log("X. no new events.");
 
-    serverState = JSON.parse(await Deno.readTextFile('public/data/state.json'));
+    const serverState = JSON.parse(await Deno.readTextFile('public/data/state.json'));
     console.log("2. read server state.");
     const pages = await readPages('public/data/events/');
     console.log("3. read pages.");
 
+    let output;
     const ops = {};
-    if (input.size < 10_000_000) {
-      lastFile = await readLastFile('public/data/events/' + pages.at(-1) + ".json.gz");
+    if (input.size < 4_000_000) {  //4mb gzip => 25mb json?? hopefully it wont break if we unpack in the worker.
+      const lastFile = await readLastFile('public/data/events/' + pages.at(-1) + ".json.gz");
       console.log("4. read lastFile");
-      if ((lastFile.size + output.size) < 10_000_000) {
+      if ((lastFile.size + input.size) < 4_000_000) {
         output = mergeJsonEventFiles(input, lastFile);
         console.log("5. merged events with lastFile");
         ops['public/data/events/' + lastFile.filename] = null;
@@ -59,7 +60,7 @@ async function main(origin, secret) {
     output ??= { ...input };
     const timestampName = `${output.events[0].timestamp}_${output.events.at(-1).timestamp}`;
     pages.push(timestampName);
-    newState = {
+    const newState = {
       lastEvent,
       snap: ObjectAssignAssign([serverState.snap, ...output.events.map(e => e.json)]),
       pages
