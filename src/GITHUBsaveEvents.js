@@ -11,7 +11,7 @@ async function readPages(directory) {
   const pages = [];
   for await (const { isFile, name } of await Deno.readDir(directory))
     if (isFile && name.endsWith('.json.gz'))
-      pages.push(name.split(".")[0]);
+      pages.push(name);
   pages.sort();
   return pages;
 }
@@ -35,7 +35,6 @@ async function main(origin, secret) {
   let input;
   try {
     input = await readInput(origin + "/api/github/events", secret);
-    const lastEvent = input.events.at(-1);
     console.log("1. read input with events count: " + input.events.length);
     if (!input.events.length)
       return console.log("X. no new events.");
@@ -48,7 +47,7 @@ async function main(origin, secret) {
     let output;
     const ops = {};
     if (input.size < 4_000_000) {  //4mb gzip => 25mb json?? hopefully it wont break if we unpack in the worker.
-      const lastFile = await readLastFile('public/data/events/' + pages.at(-1) + ".json.gz");
+      const lastFile = await readLastFile(pages.at(-1));
       console.log("4. read lastFile");
       if ((lastFile.size + input.size) < 4_000_000) {
         output = mergeJsonEventFiles(input, lastFile);
@@ -58,17 +57,17 @@ async function main(origin, secret) {
       }
     }
     output ??= { ...input };
-    const timestampName = `${output.events[0].timestamp}_${output.events.at(-1).timestamp}`;
-    pages.push(timestampName);
+    const newFilename =
+      `public/data/events/${output.events[0].timestamp}_${output.events.at(-1).timestamp}.json.gz`;
+    pages.push(newFilename);
     const newState = {
-      lastEvent,
+      lastEvent: input.events.at(-1),
       snap: ObjectAssignAssign([serverState.snap, ...output.events.map(e => e.json)]),
-      pages
+      pages: pages.map(str => str.split("/")[0].split(".")[0])
     };
     ops['public/state.json'] = JSON.stringify(newState);
     console.log("6. prepared new state.json.");
 
-    const newFilename = 'public/data/events/' + timestampName + '.json.gz';
     ops[newFilename] = await gzipString(output.txt);
     console.log("7. prepared " + newFilename);
 
