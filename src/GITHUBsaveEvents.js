@@ -76,8 +76,11 @@ async function main(origin, secret) {
       data ? Deno.writeTextFile(path, data) : Deno.remove(path)));
     console.log("8. wrote files", origin);
   } catch (err) {
-    if (input)
-      Deno.writeTextFile('data_invalid/' + new Date().getTime() + ".json", input.txt);
+    console.error("E. failed to read input", err.message);
+    if (!input)
+      return console.error("E. failed to read input", err.message);
+    await Deno.mkdir("data_invalid/", { recursive: true });
+    Deno.writeTextFile('data_invalid/' + new Date().getTime() + ".json", input.txt);
   }
 }
 
