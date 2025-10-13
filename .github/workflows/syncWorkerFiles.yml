@@ -1,0 +1,32 @@
+name: Sync Worker Files
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Runs every day at 00:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  # actions: read
+
+jobs:
+  sync:
+    name: Sync public/data/events
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          #no pat token, as there is no protected branch..
+          fetch-depth: 0
+
+      - name: Execute worker sync script
+        env:
+          BASE_URL: ${{ vars.CF_DOMAIN }}
+          CF_GH_SECRET: ${{ secrets.CF_GH_SECRET }}
+          COMMIT: true
+        run: |
+          chmod +x .github/workflows/syncWorkerFiles.sh
+          bash .github/workflows/syncWorkerFiles.sh

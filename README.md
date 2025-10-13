@@ -16,16 +16,16 @@
     * `events/` (folder with event files)
     * `snaps/` (folder with snapshots matching event pages)
 
-## how to run locally
+## HowTo: run locally
 
 To run the worker locally, use the commands:
 1. `npx wrangler dev --port 3033` (in the FIRST terminal console in project root folder)
-2. go to `http://127.0.0.1:3033/ai/backup` (login using google oauth as prompted).
-3. in the FIRST terminal, you will see a log entry that looks like this: `deno run --allow-net --allow-read=data/ --allow-write=data/ scripts/workerEvents.js "http://127.0.0.1:3033" "1" "<secret>"`
-4. copy the command and run it in a SECOND terminal console in project root folder. This will then trigger the deno server script with correct paramaters.
-5. To debug the workerEvents.js script, you can add `--inspect-brk=127.0.0.1:9230` after `deno run` in the command above, and then open `chrome://inspect` in a chrome browser to debug it.
-6. To debug the worker code, and press [d] in the FIRST terminal console to open the inspector in a browser.
-7. It is not possible to run the workerEvents.js script on localhost yet.
+
+2. To test the GitHub sync script against your local worker:
+```bash
+CF_DOMAIN="http://127.0.0.1:3033" CF_GH_SECRET="your_github_pat_token" COMMIT="false" \
+bash -x .github/workflows/syncWorkerFiles.sh
+```
 
 ## overview 
 
@@ -35,19 +35,20 @@ Below is a receipe for how to replicate this project from scratch. It involves a
 
 ```
 ORIGIN="http://127.0.0.1:3033"
-OAUTH_USERS="orstavik77@gmail.com;jeramydaradal@gmail.com"
+OAUTH_USERS="orstavik77@gmail.com"
 GOOGLE_ID="12345.apps.googleusercontent.com"
 GOOGLE_SECRET="GOCSPX-12345"
 GOOGLE_REDIRECT="http://127.0.0.1:3033/auth/callback"
 # GOOGLE_REDIRECT="<cloudflare link>/auth/callback"
 
+CF_DOMAIN="<projectname>.workers.dev"
 IMAGE_SERVER_ACCOUNT_ID="12345"
 IMAGE_SERVER_API_TOKEN="12345"
 
-GITHUB_PASSPHRASE="hello sunshine"
 GITHUB_REPO="orstavik/cms201"
-GITHUB_WORKFLOW="https://api.github.com/repos/<reponame>/actions/workflows/saveEvents/dispatches"
-GITHUB_PAT="github_pat_12345"
+GITHUB_WORKFLOW="https://api.github.com/repos/<reponame>/actions/workflows/syncWorkerFiles/dispatches"
+
+CF_GH_SECRET="github_pat_12345"
 GITHUB_TTL="300" 
 # GITHUB_TTL="5"00" # in prod 5 minutes, the allowed delay time for the cloudflare secret given github.
 ```
@@ -100,8 +101,9 @@ at this point, should we make the .dev.vars file?? In one place.
     8. Copy the token
 => github PAT
 8. Update github environment variable DOMAIN.
-    1. Go to github.com/${githubusername}/${projectname}/settings/environments
-    2. Click "New environment"
+    1. Go to https://github.com/${GITHUB_REPO}$/settings/secrets/actions
+    2. Click "New repository secret"
+        * Name: `DOMAIN`, => value: `${projectname}.workers.dev`
     3. Name: `production`
     4. Click "Configure environment"
     5. Click "Add variable"
@@ -111,7 +113,7 @@ at this point, should we make the .dev.vars file?? In one place.
     1. Go to dash.cloudflare.com
     2. Go to "Compute" > "Workers & Pages" > select your project > "Settings" > "Environment Variables"
     3. Click "Add variable"
-        * Name: `GITHUB_PAT`, `Secret`, => value: `github PAT`
+        * Name: `CF_GH_SECRET`, `Secret`, => value: `github PAT`
         * Name: `OAUTH_CLIENT_ID`, `Secret`, => value: `google auth client id`
         * Name: `OAUTH_CLIENT_SECRET`, `Secret`, => value: `google auth secret`
         * Name: `EMAIL`, `Text`, => value: `gmail`
