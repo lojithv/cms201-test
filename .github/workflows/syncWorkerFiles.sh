@@ -53,7 +53,10 @@ fi
 
 echo "4. Calling ${BASE_URL}/api/github/syncEnd"
 response=$(curl -sS \
+  -X POST \
   -H "Authorization: Bearer ${CF_GH_SECRET}" \
+  -H "Content-Type: text/plain" \
+  -d "$LIST" \
   -w "\n%{http_code}" "${BASE_URL}/api/github/syncEnd")
 status=$(echo "$response" | tail -n1)
 body=$(echo "$response" | sed '$d')

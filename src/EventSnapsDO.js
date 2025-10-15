@@ -3,8 +3,8 @@ import { ObjectAssignAssign } from "./tools.js";
 
 export class EventsSnaps extends DurableObject {
 
-  #startState;
   #currentState;
+  #syncStart;
 
   constructor(ctx, env) {
     super(ctx, env);
@@ -15,28 +15,91 @@ CREATE TABLE IF NOT EXISTS events (
   timestamp INTEGER NOT NULL DEFAULT (unixepoch('now')),
   email     TEXT NOT NULL,
   json      TEXT NOT NULL
-);`);
-    ctx.blockConcurrencyWhile(async () => {
-      const res = await this.env.ASSETS.fetch(new URL("/data/state.json", "https://assets.local"));
-      if (!res.ok) throw new Error(`ASSETS fetch failed: ${res.status}`);
-      const startState = await res.json();
-      if (this.#startState?.lastEventId >= startState.lastEventId)
-        return;
-      this.#startState = this.#currentState = startState;
-      this.sql.exec(`DELETE FROM events WHERE id <= ?`, startState.lastEventId); //todo unsafe
-      const events = this.getEvents();
-      if (!events.length)
-        return;
-      ObjectAssignAssign(this.#currentState.snap, ...events.map(e => e.json));
-      this.#currentState.lastEventId = events.at(-1).id;
+);
 
-      //todo make unsafe safer
-      //todo how can we make this safer? I am worried about problems with the id being lower or something
-      //todo should we use both timestamp and id? 
-      //If we then get some events with the same event id, but different timestamp, we have an error point.
-      //we might also like to check all the events. That will be waaay slower. Nah.. Github must be the source of truth.
-      //how do we check that the event is stored in github. We would then need to check the last page on github and verify one by one.
+CREATE TABLE IF NOT EXISTS files (
+  id        TEXT PRIMARY KEY NOT NULL,
+  timestamp INTEGER NOT NULL DEFAULT (unixepoch('now')),
+  email     TEXT NOT NULL,
+  name      TEXT NOT NULL,
+  mime      TEXT NOT NULL,
+  data      BLOB NOT NULL
+);`);
+    if (this.#currentState)
+      return;
+    this.ctx.waitUntil(async _ => {
+      const res = await this.env.ASSETS.fetch(new URL("/data/state.json", "https://assets.local"));
+      if (!res.ok)
+        throw new Error("Failed to load initial state: " + res.status + " " + res.statusText);
+      this.#currentState = await res.json();
     });
+  }
+
+  readFile(filename) {
+    const [type, one] = filename.split("/");
+    if (type == "files") {
+      const { data, mime } = this.sql.exec(`SELECT data, mime FROM files WHERE id = ?`, id).next().value;
+      return new Blob([data], { type: mime });
+    } else if (type == "events") {
+      const [[startTime, startId], [endTime, endId]] = one.split(".")[0].split("-").map(s => s.split("_"));
+      if (!startTime || !startId || !endTime || !endId)
+        throw new Error("Events filename file is corrupted: " + filename);
+      const res = this.sql.exec(`SELECT * FROM events WHERE id BETWEEN ? AND ? ORDER BY id ASC`, startId, endId).toArray();
+      if (res[0].timestamp != startTime || res[res.length - 1].timestamp != endTime)
+        throw new Error("Events filename doesn't match do reality: " + filename);
+      for (const r of res)
+        r.json = JSON.parse(r.json);
+      return new Blob([JSON.stringify(res)], { type: "application/json" });
+    } else if (type == "snap.json") {
+      return new Blob([JSON.stringify(this.#currentState.snap)], { type: "application/json" });
+    }
+    throw new Error("Unknown file: " + filename);
+  }
+
+  addFile(email, { filename, contentType, data }) {
+    const key = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    this.sql.exec(`INSERT INTO files (id, email, name, mime, data) VALUES (?, ?, ?, ?, ?)`, key, email, filename, contentType, data);
+    return key;
+  }
+
+  getEventFileName() {
+    const eA = this.sql.exec(`SELECT * FROM events ORDER BY id ASC LIMIT 1`).next().value;
+    if (!eA) return;
+    const eZ = this.sql.exec(`SELECT * FROM events ORDER BY id DESC LIMIT 1`).next().value;
+    return `${eA.timestamp}_${eA.id}-${eZ.timestamp}_${eZ.id}`;
+  }
+
+  syncStart() {
+    const res = this.sql.exec(`SELECT name FROM files ORDER BY id DESC`).toArray();
+    const eventFile = this.getEventFileName();
+    if (eventFile)
+      res.push(eventFile + ".json.gz");
+    if (!res.length)
+      return "";
+    res.push("snap.json");
+    return this.#syncStart = res.join(" ");
+  }
+
+  syncEnd(files) {
+    if (!this.#syncStart)
+      throw new Error("You must call syncStart before syncEnd.");
+    if (files !== this.#syncStart)
+      throw new Error("The files list does not match the one from syncStart.");
+
+    for (const f of files.split(" ")) {
+      const [type, one] = filename.split("/");
+      if (type == "files")
+        this.sql.exec(`DELETE FROM files WHERE name = ?`, one);
+      else if (type == "events") {
+        const [[startTime, startId], [endTime, endId]] = one.split(".")[0].split("-").map(s => s.split("_"));
+        if (!startTime || !startId || !endTime || !endId)
+          throw new Error("Events filename file is corrupted: " + filename);
+        this.sql.exec(`DELETE FROM events WHERE id BETWEEN ? AND ?`, startId, endId);
+      } else if (type == "snap.json") {
+      } else
+        throw new Error("Unknown file: " + filename);
+    }
+    this.#syncStart = null;
   }
 
   getEvents() {

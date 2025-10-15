@@ -11,13 +11,14 @@
   }
 </script>
 
-<lh>Convenience endpoints</lh>
+<lh>Simple steps</lh>
 <li><a href="/" target="_blank">Back to main</a></li>
-
 <li><a href="/auth/checkLogin" target="_blank">check login</a></li>
-<lh>POST check content of console.log</lh>
+<li><a href="/auth/logout" target="_blank">logout</a></li><lh>POST check content of console.log</lh>
+
+<lh>uploads</lh>
 <li>/api/addEvent
-  <form method="POST" action="/api/addEvent" onsubmit="postJson(event)"><!--   -->
+  <form method="POST" action="/api/addEvent" onsubmit="postJson(event)">
     <textarea name="events" rows="10" cols="50">
       { "bob": { "one": 1, "two": 2} }
     </textarea>
@@ -25,10 +26,25 @@
     <button>addEvent</button>
   </form>
 </li>
-<lh>GET check content of events</lh>
+<li>/api/addFile
+  <form method="POST" action="/api/addFile" enctype="multipart/form-data">
+    <input type="file" name="file" required>
+    <br>
+    <input type="text" name="filename" placeholder="Optional filename">
+    <br>
+    <input type="text" name="contentType" placeholder="Optional content type">
+    <br>
+    <button>addFile</button>
+  </form>
+</li>
+
+<lh>GET files and events</lh>
 <li><a href="/api/events" target="_blank">/api/events</a></li>
 <li><a href="/api/events/2" target="_blank">/api/events/2</a></li>
-<lh>GET start backup</lh>
+<li>
+  <input type="text" id="filename" placeholder="Enter filename">
+  <button onclick="window.open('/api/readFile/' + document.getElementById('filename').value, '_blank')">Read File</button>
+</li>
+
+<lh>GET start GITHUB backup (only in production)</lh>
 <li><a href="/api/backup" target="_blank">backup</a></li>
-<lh>GET check content of image URL</lh>
-<li><a href="/api/uploadImageURL" target="_blank">upload image URL</a></li>

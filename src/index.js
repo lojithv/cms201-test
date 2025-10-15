@@ -42,6 +42,9 @@ const UNSECURE_SAME_SITE_PATHS = {
 		}
 		return imgURLs;
 	},
+	"GET /api/readFile": async function (req, env, ctx) {
+		return await DB(env).readFile(req.url.pathname.replace("/api/readFile/", ""));
+	},
 };
 
 const UNSECURE_PATHS = {
@@ -96,13 +99,25 @@ const UNSECURE_PATHS = {
 };
 
 const GITHUB_SECURE_PATHS = {
-	"GET /api/github/events": async function (req, env) {
-		return await DB(env).getEvents();
+	"GET /api/github/syncStart": async function (req, env) {
+		return await DB(env).syncStart();
+	},
+	"POST /api/github/syncEnd": async function (req, env) {
+		const files = await req.text();
+		return await DB(env).syncEnd(files);
+	},
+	"GET /api/github/readFile": async function (req, env) {
+		return await DB(env).readFile(req.url.pathname.replace("/api/github/readFile/", ""));
 	},
 };
 
 const SECURE_PATHS = {
 	"GET /api/events": async function (req, env, ctx) {
+		const pathParts = req.url.pathname.split("/");
+		const id = pathParts[3]; // /api/events/{id}
+		if (id) {
+			return await DB(env).getEvents(Number(id));
+		}
 		return await DB(env).getEvents();
 	},
 	"GET /admin": function (req, env, ctx, user) {
@@ -117,27 +132,35 @@ const SECURE_PATHS = {
 			throw new Error("You can only add a non-empty json object as event data.");
 		return await DB(env).addEvent(user, json);
 	},
+	"POST /api/addFile": async function (req, env, ctx, user) {
+		const formData = await req.formData();
+		const file = formData.get("file");
+		if (!(file instanceof File))
+			throw new Error("You can only add a file.");
+		const filename = formData.get("filename") || file.name;
+		if (!filename)
+			throw new Error("Filename is required.");
+		const contentType = formData.get("contentType") || file.type; // this we do on deliver || "application/octet-stream";
+		const arrayBuffer = await file.arrayBuffer();
+		if (!arrayBuffer || !arrayBuffer.byteLength)
+			throw new Error("File is empty.");
+		const uint8Array = new Uint8Array(arrayBuffer);
+		return await DB(env).addFile(user, { filename, contentType, data: uint8Array });
+	},
 	"GET /api/backup": async function (req, env, ctx, user) {
-		const body = {
-			secret: await env.settings.github.coder.makeSecret(env.settings.github.ttl)
-		};
-		// --inspect-brk=127.0.0.1:9230\
-		console.log(`deno run \
-			--allow-net --allow-read=public/data/ --allow-write=public/data/ \
-			 src/githubSaveEvents.js "${env.settings.origin}" "${body.secret}"`);
-		// const res = await fetch(env.settings.github.workflow, {
-		// 	method: 'POST',
-		// 	headers: {
-		// 		'Content-Type': 'application/json',
-		// 		'Authorization': `Bearer ${env.settings.github.pat}`,
-		// 		'X-GitHub-Api-Version': '2022-11-28',
-		// 		"Accept": "application/vnd.github+json",
-		// 		'User-Agent': 'cms201-worker/1.0'
-		// 	},
-		// 	body: JSON.stringify(body),
-		// });
-		// if (!res.ok)
-		// 	throw new Error("Error triggering backup workflow: " + await res.text());
+		const res = await fetch(env.settings.github.workflow, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${env.settings.github.pat}`,
+				'X-GitHub-Api-Version': '2022-11-28',
+				"Accept": "application/vnd.github+json",
+				'User-Agent': 'cms201-worker/1.0'
+			},
+			body: JSON.stringify({ ref: 'main' }),
+		});
+		if (!res.ok)
+			throw new Error("Error triggering backup workflow: " + await res.text());
 		return "ok. backup initiated."
 	},
 	"GET /auth/checkLogin": async function (req, env, ctx, user) {
@@ -186,7 +209,7 @@ async function settings(env) {
 			repo: env.GITHUB_REPO,
 			pat: env.GITHUB_PAT,
 			workflow: env.GITHUB_WORKFLOW,
-			coder: await AesGcmHelper.make(env.GITHUB_PASSPHRASE),
+			// coder: await AesGcmHelper.make(env.GITHUB_PASSPHRASE),
 			ttl: Number(env.GITHUB_TTL) * 60 * 1000,
 		},
 		image_server: {
@@ -216,8 +239,15 @@ async function onFetch(request, env, ctx) {
 		}									//validate end
 		if (!endPoint) {
 			endPoint = getEndpoint(request, GITHUB_SECURE_PATHS);
-			if (endPoint)
-				await env.settings.github.coder.validateSecret(request);
+			if (endPoint) {
+				const authHeader = request.headers.get("Authorization");
+				if (!authHeader?.startsWith("Bearer "))
+					throw "Missing Authorization Bearer token";
+				// For now, just check if token matches PAT - in production you might want stronger validation
+				const token = authHeader.split("Bearer ")[1];
+				if (token !== env.settings.github.pat)
+					throw "Invalid GitHub token";
+			}
 		}
 		let user;
 		if (!endPoint) {
