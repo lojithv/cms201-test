@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS files (
       return;
 
     this.ctx.blockConcurrencyWhile(async _ => {
-      const res = await this.env.ASSETS.fetch(new URL("public/data/state.json", "https://assets.local"));
+      const res = await this.env.ASSETS.fetch(new URL("public/data/snap.json", "https://assets.local"));
       if (!res.ok)
         throw new Error("Failed to load initial state: " + res.status + " " + res.statusText);
       const snap = await res.json();
