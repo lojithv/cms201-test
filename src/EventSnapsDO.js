@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS files (
       const res = await this.env.ASSETS.fetch(new URL("public/data/state.json", "https://assets.local"));
       if (!res.ok)
         throw new Error("Failed to load initial state: " + res.status + " " + res.statusText);
-      this.#currentState = await res.json();
+      const snap = await res.json();
+      this.#currentState = { snap };
     });
   }
 
@@ -112,12 +113,8 @@ CREATE TABLE IF NOT EXISTS files (
 
   async addEvent(email, json) {
     this.sql.exec(`INSERT INTO events (email, json) VALUES (?, ?)`, email, JSON.stringify(json));
-    const newState = {
-      lastEventId: this.sql.exec("SELECT * FROM events ORDER BY id DESC LIMIT 1").next().value?.id,
-      snap: ObjectAssignAssign(this.#currentState.snap, json),
-      pages: this.#currentState.pages,
-    };
-    return this.#currentState = newState;
+    const snap = ObjectAssignAssign(this.#currentState.snap, json);
+    return this.#currentState = { snap };
   }
 
   async getSnap(name, cb) {
