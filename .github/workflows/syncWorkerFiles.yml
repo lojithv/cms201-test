@@ -19,7 +19,7 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v4
         with:
-          #no pat token, as there is no protected branch..
+          #no pat token yet, as there is no protected branch..
           fetch-depth: 0
 
       - name: Execute worker sync script
