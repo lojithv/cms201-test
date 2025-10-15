@@ -1,6 +1,15 @@
 import { DurableObject } from "cloudflare:workers";
 import { ObjectAssignAssign } from "./tools.js";
 
+async function sha256base64UrlSafe(uint8Array) {
+  const digest = await crypto.subtle.digest("SHA-256", uint8Array);
+  const out = new Uint8Array(digest);
+  let res = "";
+  for (let i = 0; i < out.length; i++)
+    res += String.fromCharCode(out[i]);
+  return btoa(res).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
 export class EventsSnaps extends DurableObject {
 
   #currentState;
@@ -18,13 +27,17 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE TABLE IF NOT EXISTS files (
-  id        TEXT PRIMARY KEY NOT NULL,
-  timestamp INTEGER NOT NULL DEFAULT (unixepoch('now')),
-  email     TEXT NOT NULL,
-  name      TEXT NOT NULL,
-  mime      TEXT NOT NULL,
-  data      BLOB NOT NULL
-);`);
+  id          TEXT PRIMARY KEY            -- 43 chars, URL-safe base64 (no '=')
+                COLLATE BINARY             -- case-sensitive (required for base64)
+                CHECK (length(hash_b64u) = 43)
+                CHECK (hash_b64u GLOB '[A-Za-z0-9_-]*'),
+  timestamp   INTEGER NOT NULL DEFAULT (unixepoch('now')),
+  email       TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  mime        TEXT NOT NULL,
+  size        INTEGER NOT NULL,
+  data        BLOB NOT NULL
+) WITHOUT ROWID;`);
     if (this.#currentState)
       return;
 
@@ -46,8 +59,8 @@ CREATE TABLE IF NOT EXISTS files (
       if (!startTime || !startId || !endTime || !endId)
         throw new Error("Events filename file is corrupted: " + filename);
       const res = this.sql.exec(`SELECT * FROM events WHERE id BETWEEN ? AND ? ORDER BY id ASC`, startId, endId).toArray();
-      if (res[0].timestamp != startTime || res[res.length - 1].timestamp != endTime)
-        throw new Error("Events filename doesn't match do reality: " + filename);
+      if (!res || res[0].timestamp != startTime || res[res.length - 1].timestamp != endTime)
+        throw new Error("Events filename doesn't match state in DO: " + filename);
       for (const r of res)
         r.json = JSON.parse(r.json);
       return new Blob([JSON.stringify(res)], { type: "application/json" });
@@ -57,10 +70,13 @@ CREATE TABLE IF NOT EXISTS files (
     throw new Error("Unknown file: " + filename);
   }
 
-  addFile(email, { filename, contentType, data }) {
-    const key = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    this.sql.exec(`INSERT INTO files (id, email, name, mime, data) VALUES (?, ?, ?, ?, ?)`, key, email, filename, contentType, data);
-    return key;
+  async addFile(email, { filename, contentType, data }) {
+    const id = await sha256base64UrlSafe(data);
+    const nameDB = this.sql.exec(`SELECT name FROM files WHERE id = ?`, id).next()?.value?.name;
+    if (!nameDB)
+      this.sql.exec(`INSERT INTO files (id, email, name, mime, size, data) VALUES (?, ?, ?, ?, ?, ?)`,
+        id, email, nameDB = filename, contentType, data.byteLength, data);
+    return `files/${key}/${nameDB}`;
   }
 
   getEventFileName() {
@@ -113,7 +129,7 @@ CREATE TABLE IF NOT EXISTS files (
   async addEvent(email, json) {
     this.sql.exec(`INSERT INTO events (email, json) VALUES (?, ?)`, email, JSON.stringify(json));
     const snap = ObjectAssignAssign(this.#currentState.snap, json);
-    return this.#currentState = { snap };
+    return this.#currentState = { ...this.#currentState, snap };
   }
 
   async getSnap(name, cb) {
