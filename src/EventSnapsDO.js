@@ -28,13 +28,11 @@ CREATE TABLE IF NOT EXISTS files (
     if (this.#currentState)
       return;
 
-    let resolveState;
-    this.#currentState = new Promise(r => resolveState = r);
-    this.ctx.waitUntil(async _ => {
+    this.ctx.blockConcurrencyWhile(async _ => {
       const res = await this.env.ASSETS.fetch(new URL("public/data/state.json", "https://assets.local"));
       if (!res.ok)
         throw new Error("Failed to load initial state: " + res.status + " " + res.statusText);
-      resolveState(await res.json());
+      this.#currentState = await res.json();
     });
   }
 
@@ -54,8 +52,7 @@ CREATE TABLE IF NOT EXISTS files (
         r.json = JSON.parse(r.json);
       return new Blob([JSON.stringify(res)], { type: "application/json" });
     } else if (type == "snap.json") {
-      const currentState = await this.#currentState;
-      return new Blob([JSON.stringify(currentState.snap)], { type: "application/json" });
+      return new Blob([JSON.stringify(this.#currentState.snap)], { type: "application/json" });
     }
     throw new Error("Unknown file: " + filename);
   }
@@ -115,19 +112,17 @@ CREATE TABLE IF NOT EXISTS files (
 
   async addEvent(email, json) {
     this.sql.exec(`INSERT INTO events (email, json) VALUES (?, ?)`, email, JSON.stringify(json));
-    const currentState = await this.#currentState;
     const newState = {
       lastEventId: this.sql.exec("SELECT * FROM events ORDER BY id DESC LIMIT 1").next().value?.id,
-      snap: ObjectAssignAssign(currentState.snap, json),
-      pages: currentState.pages,
+      snap: ObjectAssignAssign(this.#currentState.snap, json),
+      pages: this.#currentState.pages,
     };
     return this.#currentState = newState;
   }
 
   async getSnap(name, cb) {
-    const currentState = await this.#currentState;
-    if (!name) return currentState.snap;
+    if (!name) return this.#currentState.snap;
     if (!cb) throw new Error("You must provide a callback to process the snap in order to get a custom snap.");
-    return (currentState.snaps ??= {})[name] ??= cb(currentState.snap);
+    return (this.#currentState.snaps ??= {})[name] ??= cb(this.#currentState.snap);
   }
 }
