@@ -123,9 +123,9 @@ const SECURE_PATHS = {
 	"GET /admin": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
 	},
-	// "GET /data": function (req, env, ctx, user) {
-	// 	return env.ASSETS.fetch(req);
-	// },
+	"GET /data": function (req, env, ctx, user) {
+		return env.ASSETS.fetch(req);
+	},
 	"POST /api/addEvent": async function (req, env, ctx, user) {
 		const json = await req.json();
 		if (!json || typeof json !== "object" || !Object.keys(json).length)

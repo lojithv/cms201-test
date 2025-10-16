@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE TABLE IF NOT EXISTS files (
   id          TEXT PRIMARY KEY            -- 43 chars, URL-safe base64 (no '=')
                 COLLATE BINARY             -- case-sensitive (required for base64)
-                CHECK (length(hash_b64u) = 43)
-                CHECK (hash_b64u GLOB '[A-Za-z0-9_-]*'),
+                CHECK (length(id) = 43)
+                CHECK (id GLOB '[A-Za-z0-9_-]*'),
   timestamp   INTEGER NOT NULL DEFAULT (unixepoch('now')),
   email       TEXT NOT NULL,
   name        TEXT NOT NULL,
@@ -57,8 +57,17 @@ CREATE TABLE IF NOT EXISTS files (
   async readFile(filename) {
     const [type, one] = filename.split("/");
     if (type == "files") {
-      const { data, mime } = this.sql.exec(`SELECT data, mime FROM files WHERE id = ?`, one).next().value;
-      return new Blob([data], { type: mime });
+      const result = this.sql.exec(`SELECT data, mime, name FROM files WHERE id = ?`, one).next().value;
+      if (!result) {
+        return new Response("File not found", { status: 404 });
+      }
+      const { data, mime, name } = result;
+      return new Response(data, {
+        headers: {
+          'Content-Type': mime,
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`
+        }
+      });
     } else if (type == "events") {
       const [[startTime, startId], [endTime, endId]] = one.split(".")[0].split("-").map(s => s.split("_"));
       if (!startTime || !startId || !endTime || !endId)
@@ -68,20 +77,30 @@ CREATE TABLE IF NOT EXISTS files (
         throw new Error("Events filename doesn't match state in DO: " + filename);
       for (const r of res)
         r.json = JSON.parse(r.json);
-      return new Blob([JSON.stringify(res)], { type: "application/json" });
+      return new Response(JSON.stringify(res), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Disposition': `attachment; filename="${filename}"`
+        }
+      });
     } else if (type == "snap.json") {
-      return new Blob([JSON.stringify(this.#currentState.snap)], { type: "application/json" });
+      return new Response(JSON.stringify(this.#currentState.snap), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Disposition': 'attachment; filename="snap.json"'
+        }
+      });
     }
     throw new Error("Unknown file: " + filename);
   }
 
   async addFile(email, { filename, contentType, data }) {
     const id = await sha256base64UrlSafe(data);
-    const nameDB = this.sql.exec(`SELECT name FROM files WHERE id = ?`, id).next()?.value?.name;
+    let nameDB = this.sql.exec(`SELECT name FROM files WHERE id = ?`, id).next()?.value?.name;
     if (!nameDB)
       this.sql.exec(`INSERT INTO files (id, email, name, mime, size, data) VALUES (?, ?, ?, ?, ?, ?)`,
         id, email, nameDB = filename, contentType, data.byteLength, data);
-    return `files/${key}/${nameDB}`;
+    return `files/${id}/${nameDB}`;
   }
 
   getEventFileName() {
@@ -115,7 +134,7 @@ CREATE TABLE IF NOT EXISTS files (
       else if (type == "events") {
         const [[startTime, startId], [endTime, endId]] = one.split(".")[0].split("-").map(s => s.split("_"));
         if (!startTime || !startId || !endTime || !endId)
-          throw new Error("Events filename file is corrupted: " + filename);
+          throw new Error("Events filename file is corrupted: " + f);
         this.sql.exec(`DELETE FROM events WHERE id BETWEEN ? AND ?`, startId, endId);
       } else if (type == "snap.json") {
       } else
