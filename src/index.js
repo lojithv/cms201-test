@@ -123,8 +123,11 @@ const SECURE_PATHS = {
 	"GET /admin": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
 	},
-	"GET /data": function (req, env, ctx, user) {
-		return env.ASSETS.fetch(req);
+	"GET /data": async function (req, env, ctx, user) {
+		const res = await this.env.ASSETS.fetch(new URL("/data/snap.json", "https://assets.local"));
+		if (res.ok)
+			return res;
+		return DB(env).readFile(req.url.pathname.replace("/data/", ""));
 	},
 	"POST /api/addEvent": async function (req, env, ctx, user) {
 		const json = await req.json();

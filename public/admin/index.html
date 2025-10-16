@@ -22,7 +22,7 @@
       const files = await resp.json();
       for (const file of files)
         ol.insertAdjacentHTML('beforeend',
-          '<li><a href="/api/readFile/' + file + '" target="_blank">' + file + '</a></li>');
+          `<li><a href="/data/${file}" target="_blank">/data/${file}</a></li>`);
     }
     main();
   </script>
