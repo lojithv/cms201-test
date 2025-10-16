@@ -12,7 +12,7 @@ permissions:
 jobs:
   sync:
     name: Sync public/data/events
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # docs: https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
     timeout-minutes: 30
 
     steps:

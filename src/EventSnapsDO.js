@@ -42,10 +42,15 @@ CREATE TABLE IF NOT EXISTS files (
       return;
 
     this.ctx.blockConcurrencyWhile(async _ => {
-      const res = await this.env.ASSETS.fetch(new URL("/data/state.json", "https://assets.local"));
-      if (!res.ok)
-        throw new Error("Failed to load initial state: " + res.status + " " + res.statusText);
-      this.#currentState = await res.json();
+      const snapR = await this.env.ASSETS.fetch(new URL("/data/snap.json", "https://assets.local"));
+      if (!snapR.ok)
+        throw new Error("Failed to load initial state: " + snapR.status + " " + snapR.statusText);
+      const snap = await snapR.json();
+      const filesR = await this.env.ASSETS.fetch(new URL("/data/files.json", "https://assets.local"));
+      if (!filesR.ok)
+        throw new Error("Failed to load initial files: " + filesR.status + " " + filesR.statusText);
+      const files = await filesR.json();
+      this.#currentState = { snap, files };
     });
   }
 

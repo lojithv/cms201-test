@@ -1,3 +1,5 @@
+TARGET_DIR="public/data/"
+
 set -euo pipefail
 
 echo "1. Sync starting... ${BASE_URL}/api/github/syncStart"
@@ -24,7 +26,7 @@ for file in $(echo "$LIST" | xargs); do
 
   # Treat 2xx with non-empty body as "has data"
   if [[ "$http" =~ ^2 && -s "$tmp" ]]; then
-    target="public/data/events/${file}"     
+    target="${TARGET_DIR}${file}"     
     echo "4. saving file... ${target}"
     mkdir -p "$(dirname "$target")"
     mv "$tmp" "$target"
@@ -37,8 +39,15 @@ for file in $(echo "$LIST" | xargs); do
   rm -f "$tmp"
 done
 
+echo "4. Generating file list in files.json"
+find "$TARGET_DIR" -type f \
+  | cut -c $(( ${#TARGET_DIR} + 1 ))- \
+  | jq -R . \
+  | jq -s . \
+> files.json
+
 gitStatus=$(git status --porcelain)
-echo "To be commited: ${gitStatus}"
+echo "5. To be commited: ${gitStatus}"
 
 COMMIT=${COMMIT:-false}
 if [[ -n "$gitStatus" && "$COMMIT" == "true" ]]; then
@@ -51,7 +60,7 @@ if [[ -n "$gitStatus" && "$COMMIT" == "true" ]]; then
 fi
 
 
-echo "4. Calling ${BASE_URL}/api/github/syncEnd"
+echo "6. Calling ${BASE_URL}/api/github/syncEnd"
 response=$(curl -sS \
   -X POST \
   -H "Authorization: Bearer ${CF_GH_SECRET}" \
