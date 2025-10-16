@@ -11,10 +11,28 @@
   }
 </script>
 
+<ol>
+  <lh>All the entries of /data/files.json</lh>
+  <script>
+    const ol = document.currentScript.parentElement;
+    async function main() {
+      const resp = await fetch('/data/files.json');
+      if (!resp.ok)
+        return console.log('No /data/files.json yet');
+      const files = await resp.json();
+      for (const file of files)
+        ol.insertAdjacentHTML('beforeend',
+          '<li><a href="/api/readFile/' + file + '" target="_blank">' + file + '</a></li>');
+    }
+    main();
+  </script>
+</ol>
+
 <lh>Simple steps</lh>
 <li><a href="/" target="_blank">Back to main</a></li>
 <li><a href="/auth/checkLogin" target="_blank">check login</a></li>
-<li><a href="/auth/logout" target="_blank">logout</a></li><lh>POST check content of console.log</lh>
+<li><a href="/auth/logout" target="_blank">logout</a></li>
+<lh>POST check content of console.log</lh>
 
 <lh>uploads</lh>
 <li>/api/addEvent
@@ -38,13 +56,9 @@
   </form>
 </li>
 
-<lh>GET files and events</lh>
+<lh>GET events</lh>
 <li><a href="/api/events" target="_blank">/api/events</a></li>
 <li><a href="/api/events/2" target="_blank">/api/events/2</a></li>
-<li>
-  <input type="text" id="filename" placeholder="Enter filename">
-  <button onclick="window.open('/api/readFile/' + document.getElementById('filename').value, '_blank')">Read File</button>
-</li>
 
 <lh>GET start GITHUB backup (only in production)</lh>
 <li><a href="/api/backup" target="_blank">backup</a></li>
