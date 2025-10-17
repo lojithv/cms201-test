@@ -1,5 +1,4 @@
 import { getAuthGoogleUser } from "./googleAuth.js";
-import { AesGcmHelper } from "./AesGcmHelper.js";
 export { EventsSnaps } from "./EventSnapsDO.js";
 
 const DB = env => env["EVENTS_SNAPS"].get(env["EVENTS_SNAPS"].idFromName("foo"));
@@ -115,16 +114,15 @@ const SECURE_PATHS = {
 	"GET /api/events": async function (req, env, ctx) {
 		const pathParts = req.url.pathname.split("/");
 		const id = pathParts[3]; // /api/events/{id}
-		if (id) {
-			return await DB(env).getEvents(Number(id));
-		}
-		return await DB(env).getEvents();
+		if (id)
+			return DB(env).getEvents(Number(id));
+		return DB(env).getEvents();
 	},
 	"GET /admin": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
 	},
 	"GET /data": async function (req, env, ctx, user) {
-		const res = await this.env.ASSETS.fetch(new URL("/data/snap.json", "https://assets.local"));
+		const res = await env.ASSETS.fetch(req);
 		if (res.ok)
 			return res;
 		return DB(env).readFile(req.url.pathname.replace("/data/", ""));
