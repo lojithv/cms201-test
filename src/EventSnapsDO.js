@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { ObjectAssignAssign } from "./tools.js";
+import { ObjectAssignAssign, gzipString } from "./tools.js";
 
 async function sha256base64UrlSafe(uint8Array) {
   const digest = await crypto.subtle.digest("SHA-256", uint8Array);
@@ -77,9 +77,10 @@ CREATE TABLE IF NOT EXISTS files (
         throw new Error("Events filename doesn't match state in DO: " + filename);
       for (const r of res)
         r.json = JSON.parse(r.json);
-      return new Response(JSON.stringify(res), {
+      const gzArrayBuffer = await gzipString(JSON.stringify(res));
+      return new Response(gzArrayBuffer, {
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/gzip',
           'Content-Disposition': `attachment; filename="${filename}"`
         }
       });

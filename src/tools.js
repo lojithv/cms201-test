@@ -1,11 +1,9 @@
-// gzip a UTF-8 string → Uint8Array (.gz bytes)
+// gzip a UTF-8 string → ArrayBuffer (.gz bytes)
 export async function gzipString(input) {
   const bytes = new TextEncoder().encode(input);
   const cs = new CompressionStream("gzip");
-  const ab = await new Response(
-    new Blob([bytes]).stream().pipeThrough(cs)
-  ).arrayBuffer();
-  return new Uint8Array(ab);
+  const stream = new Blob([bytes]).stream().pipeThrough(cs);
+  return await new Response(stream).arrayBuffer();
 }
 
 // gunzip Uint8Array (.gz bytes) → UTF-8 string
