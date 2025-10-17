@@ -144,7 +144,12 @@ CREATE TABLE IF NOT EXISTS files (
     this.#syncStart = null;
   }
 
-  getEvents() {
+  getEvents(id) {
+    if (id) {
+      const res = this.sql.exec(`SELECT * FROM events WHERE id=?`, id).next().value;
+      res.json = JSON.parse(res.json);
+      return res;
+    }
     const res = this.sql.exec(`SELECT * FROM events`).toArray();
     for (const r of res)
       r.json = JSON.parse(r.json);

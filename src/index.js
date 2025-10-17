@@ -113,11 +113,7 @@ const GITHUB_SECURE_PATHS = {
 
 const SECURE_PATHS = {
 	"GET /api/events": async function (req, env, ctx) {
-		const pathParts = req.url.pathname.split("/");
-		const id = pathParts[3]; // /api/events/{id}
-		if (id)
-			return await DB(env).getEvents(Number(id));
-		return await DB(env).getEvents();
+		return await DB(env).getEvents(req.url.pathname.split("/")[3]);
 	},
 	"GET /admin": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
