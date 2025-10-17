@@ -132,116 +132,21 @@ at this point, should we make the .dev.vars file?? In one place.
 2. Wait for 1min??
 3. fetch `https://${projectname}.workers.dev/startup`. Make sure that it returns the same state as in the snapshot.json inside make sure that it returns the same value as was in the `data` branch commit.
 
-## Data sync process (worker <=> github)
-
-1. Every day at 02:00 the worker triggers the `/api/backup` function. (admin users can also trigger it manually). 
-2. Worker sends Github the control and 3 things:
-    * the worker's **origin**.
-    * the last **lastEventId** in the durable object memory.
-    * an encrypted **secret**.
-3. Github verifies the `secret`.
-4. Github fetches all the events upto `lastEventId` from Worker.
-5. Github saves them as `/data/events/x_y.json` files. (merging with last file if small).
-6. Github creates `/public/snap.json`.
-7. Github commits the changes.
-8. Github sends worker success msg with `lastEventId` and updated `snap`.
-9. Worker updates its first key `snap` and deletes events upto `lastEventId`.
-
-**Startup**. When the data sync process runs and there are nothing saved in the Worker's durable object, then no events will be saved on Github and only the latest `/data/snap.json` will be returned.
-
 ## Data structure
 
 **on Github**
-1. `/public/data/events/x_y.json` files. All the events between timestamps x and y. Break on size > 10mb. Format `[{id, timestamp, email, json}, ...]`.
+1. `/public/data/events/x-y.json` files. All the events between timestamps_key x and y. Format `[{id, timestamp, email, json}, ...]`.
 2. `/public/data/snap.json`. The last up-to-date version of the `{snap, lastEventId, pages}`. Snap is created using `Object.assignAssign` logic.
+3. `/public/data/files.json`. A list of all the files in the static ASSETS resources.
 
 **in Worker (durable object)**
 1. `events`. A list of all the events added to the repo. Format `[{id, timestamp, email, json}, ...]`. (in sqlite the json is stringified).
 2. `#currentState`. The last up-to-date version of the `{snap, lastEventId, pages}`.
-3. 
+3. `files`. files stored in the sqlite that is not yet pushed to github/ASSETS.
 
 ## How to timetravel using Github data?
 
 The worker's memory limit is ~30mb. Hence, history and timetravel is done page by page in the browser.
-1. Browser fetches `/data/pages.json` from Worker => from Github `/data/pages.json`. I think that `/data/pages.json` and `/data/snap.json` should be placed in the public folder? If they are there, we can access them from within the worker.
-2. 
-
-
-1. Load list of pages from `/data/pages.json`.
-2. The x and y are timestamps. Find the `x_y` for that time.
-3. Load all *older* `/data/snapWithNull/x_y.json` files than x_y.
-4. merge them using Object.assignAssignWithNull into a `snap` json object.
-5. Then load all the `/data/events/x_y.json` and add them as events.
-6. You are ready to timetravel.
-7. Likely use case is *cherrypick* whole posts or single properties that you would like to "restore". Set them up as a new event, and push them to the worker `/api/add`. 
-
-## worker chron jobs
-
-1. `/api/backup` (secured)
-* can be triggered by an admin clicking a link.
-* is triggered by a cron job every day at 02:00.
-
-Purpose: make sure that the worker data is backed up.
-    1. if there is only one event, that means that no changes have been made, just return.
-    2. else, keep `varSnap` = snapshot of the state; and `varKey` = the event id with the last event added with a timestamp that is not now. Make sure that new Date().getTime() != last.timestamp.
-    3. Try to push the events between 2 and last event to github. This can take a looong time.
-    4. If this returns ok, then the body of the response should be the new `/data/snap.json` file.
-    5. If this `/data/snap.json` is exactly the same as the snap saved in memory, things is ok, then we change the first snap by system user and delete the snaps from the sqllite database that has the key lower than `varKey`.
-    6. make sure that the worker `ctx.waitUntil()` the fetch promise.
-
-* if at any time the workflow fails, then just return. This will make the worker just try to upgrade events and its snap state the next day.
-* send an ***ERROR*** email to the gmail account.
-
-## todo
-
-1. We have a key problem. We must use timestamp.id as the key number I think.
-2. worker functions for `/admin/backup` => make a json events file and send it as a workflow dispatch to github.
-3. worker function for `/api/data/xyz` => then read and reload the corresponding `/data/xyz` from github. Cache forever.
-4. make the .yml file for cron job on github. Here, we need to add some security meassures, the llm is good at adding this.
-5. set up history.html view. Just get the pages from `/data/pages.json`, and then load the snaps and events as needed.
-6. and then we need to make `/admin/startup`?
-7. cli script for automatic copying.
-
-
-
-1. `.github/workflows/worker-events.yml`. Receives input from the worker.
-
-Purpose: store information about the changes of the app, and who made them. Write events_x_y.json files to the `/data/events/*` folder in the main branch.
-Purpose2: make the app data more compact and with better overview.
-    1. ensure that it parses as json. Ensure that it is just an array of objects with id, timestamp, email and json properties? yes?
-    1. make the `x_xk_y_yk`. x is the first event timestamp, xk is the first event key, same for y.
-    2. add other security meassures. We is there something that can be done maliciously inside the json text data?
-    3. Take the newest `/data/events/*.json` file. If this file plus the incoming file is less than 25mb, then merge them into one file, under a new name, and delete the old file. Otherwise, just add the new file as is.
-        0. How to merge two files `x1_y1.json` and `x2_y2.json`?
-        1. `x1` and `x2` are the start indexes (both on x_xk format), `y1` and `y2` the end indexes (same format).
-        2. read both files, trim them, remove `/^\s*\[/`,`/\]\s*$/`, join their remaining content, wrap them in `[...]`.
-        3. save the new file with new filename `x1_y2.json`.
-        4. delete `/data/events/x1_y1.json`.
-        5. delete `/data/snapWithNull/x1_y1.json`.
-    4. run through all the files in the `/data/events/` folder.
-    5. if no file `/data/snapWithNull/<samename>` exists, then
-    6. make an Object.assignAssign snap of the `/data/events/x_y.json`.
-    7. save it as `/data/snapWithNull/x_y.json`.
-    8. make a list `pages` of all the `x_y` names in the `/data/snapWithNull/` folder.
-    9. Run through all the `x_y.json` and make `snap` as an Object.assignAssign of them. 
-    10. save `snap` and `pages` as `/data/snap.json` and `/data/pages.json`.
-
-```js
-//todo check this one.
-//todo this needs to be done in the batch script .yml style, likely python or bash, not js. Maybe js could work, but likely much worse than python or bash.
-function Object.assignAssign(...objs) {
-  objs = objs.map(o => o.json);
-  const res = {};
-  for (let obj of objs){
-    for (let key in obj)
-      Object.assign(res[key] ??= {}, obj[key]);
-  }
-  return res;
-}
-```
-
-* in sum: whenever the worker adds a new `/data/events/x_y.json` file, then:
-    1. a new file will be added in the `<main>/data/events/` folder. This backs up the new events.
-    2. the `<main>/data/events/` and `/data/snapWithNull/` folders are cleaned.
-    3. the  `<main>/data/snap.json` and `<main>/data/pages.json` file is updated. 
-    This will leave a separate commit trace in the repo.
+1. Browser fetches `/data/files.json` from Worker.
+2. The browser finds all the `/data/events/` files. 
+3. The worker can then list all the events in this gz file.
