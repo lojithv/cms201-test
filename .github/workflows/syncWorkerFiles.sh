@@ -1,4 +1,4 @@
-TARGET_DIR="public/data/"
+TARGET_DIR="public/data"
 
 set -euo pipefail
 
@@ -26,7 +26,7 @@ for file in $(echo "$LIST" | xargs); do
 
   # Treat 2xx with non-empty body as "has data"
   if [[ "$http" =~ ^2 && -s "$tmp" ]]; then
-    target="${TARGET_DIR}${file}"     
+    target="${TARGET_DIR}/${file}"     
     echo "4. saving file... ${target}"
     mkdir -p "$(dirname "$target")"
     mv "$tmp" "$target"
@@ -42,11 +42,10 @@ for file in $(echo "$LIST" | xargs); do
 done
 
 echo "4. Generating file list in files.json"
-find "$TARGET_DIR" -type f \
-  | cut -c $(( ${#TARGET_DIR} + 1 ))- \
+find "$TARGET_DIR" -type f -printf '%P\n' \
   | jq -R . \
-  | jq -s . \
-> files.json
+  | jq -s .\
+> "${TARGET_DIR}/files.json"
 
 gitStatus=$(git status --porcelain)
 echo "5. To be commited: ${gitStatus}"
