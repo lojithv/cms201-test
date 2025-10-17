@@ -23,8 +23,8 @@ To run the worker locally, use the commands:
 
 2. To test the GitHub sync script against your local worker:
 ```bash
-CF_DOMAIN="http://127.0.0.1:3033" CF_GH_SECRET="your_github_pat_token" COMMIT="false" \
-bash -x .github/workflows/syncWorkerFiles.sh
+CF_DOMAIN="http://127.0.0.1:3033" CF_GH_SECRET="hello sunshine" COMMIT="false" \
+bash .github/workflows/syncWorkerFiles.sh
 ```
 
 ## overview 
