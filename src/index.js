@@ -162,7 +162,7 @@ const SECURE_PATHS = {
 		return "ok. backup initiated."
 	},
 	"GET /auth/checkLogin": async function (req, env, ctx, user) {
-		return "ok. Already authenticated.";
+		return "ok. Already authenticated. " + user;
 	},
 	"GET /api/uploadImageURL": async function (req, env, ctx, user) {
 		const { image_server: { account_id, api_token } } = env.settings;
@@ -194,7 +194,7 @@ function getEndpoint(req, PATHS) {
 			return PATHS[key];
 }
 
-async function settings(env) {
+function settings(env) {
 	return {
 		origin: env.ORIGIN,
 		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
@@ -226,7 +226,7 @@ function getCookie(request, name) {
 
 async function onFetch(request, env, ctx) {
 	try {
-		env.settings ??= await settings(env);
+		env.settings ??= settings(env);
 
 		Object.defineProperty(request, "url", { value: new URL(request.url) });
 		let endPoint = getEndpoint(request, UNSECURE_PATHS);
