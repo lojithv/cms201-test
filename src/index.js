@@ -98,16 +98,16 @@ const UNSECURE_PATHS = {
 };
 
 const GITHUB_SECURE_PATHS = {
-	"GET /api/github/syncStart": function (req, env) {
-		return DB(env).syncStart();
+	"GET /api/github/syncStart": async function (req, env) {
+		return await DB(env).syncStart();
 	},
 	"POST /api/github/syncEnd": async function (req, env) {
 		const files = await req.text();
-		return DB(env).syncEnd(files);
+		return await DB(env).syncEnd(files);
 	},
-	"GET /api/github/readFile": function (req, env) {
+	"GET /api/github/readFile": async function (req, env) {
 		const path = req.url.pathname.replace("/api/github/readFile/", "").split("/").map(decodeURIComponent).join("/");
-		return DB(env).readFile(path);
+		return await DB(env).readFile(path);
 	},
 };
 
@@ -116,8 +116,8 @@ const SECURE_PATHS = {
 		const pathParts = req.url.pathname.split("/");
 		const id = pathParts[3]; // /api/events/{id}
 		if (id)
-			return DB(env).getEvents(Number(id));
-		return DB(env).getEvents();
+			return await DB(env).getEvents(Number(id));
+		return await DB(env).getEvents();
 	},
 	"GET /admin": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
