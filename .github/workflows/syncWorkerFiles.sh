@@ -32,9 +32,11 @@ for file in $(echo "$LIST" | xargs); do
     mv "$tmp" "$target"
     git add "$target"
   elif [[ "$http" =~ ^2 ]]; then
-    echo "E1. File $url is empty."
+    echo "E1. Empty file: ${url}"
+    exit 1
   else
-    echo "E2. Failed fetching $url."
+    echo "E2. File not found: ${url}"
+    exit 1
   fi
   rm -f "$tmp"
 done

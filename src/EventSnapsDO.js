@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS files (
     let nameDB = this.sql.exec(`SELECT name FROM files WHERE id = ?`, id).next()?.value?.name;
     if (!nameDB)
       this.sql.exec(`INSERT INTO files (id, email, name, mime, size, data) VALUES (?, ?, ?, ?, ?, ?)`,
-        id, email, nameDB = filename, contentType, data.byteLength, data);
+        id, email, (nameDB = filename), contentType, data.byteLength, data);
     return `files/${id}/${nameDB}`;
   }
 
