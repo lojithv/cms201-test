@@ -2,10 +2,10 @@ TARGET_DIR="public/data/"
 
 set -euo pipefail
 
-echo "1. Sync starting... ${BASE_URL}/api/github/syncStart"
+echo "1. Sync starting... ${CF_DOMAIN}/api/github/syncStart"
 LIST=$(curl -fsS  \
   -H "Authorization: Bearer ${CF_GH_SECRET}" \
-  "${BASE_URL}/api/github/syncStart"
+  "${CF_DOMAIN}/api/github/syncStart"
 )
 echo "2. Sync list of files: '$LIST'."
 
@@ -15,7 +15,7 @@ if [[ -z "${LIST//[[:space:]]/}" ]]; then
 fi
 
 for file in $(echo "$LIST" | xargs); do
-  url="${BASE_URL}/api/github/readFile/${file}"
+  url="${CF_DOMAIN}/api/github/readFile/${file}"
   echo "3. fetching file... ${url}"
   tmp="$(mktemp)"
   http=$(curl -sS \
@@ -60,13 +60,13 @@ if [[ -n "$gitStatus" && "$COMMIT" == "true" ]]; then
 fi
 
 
-echo "6. Calling ${BASE_URL}/api/github/syncEnd"
+echo "6. Calling ${CF_DOMAIN}/api/github/syncEnd"
 response=$(curl -sS \
   -X POST \
   -H "Authorization: Bearer ${CF_GH_SECRET}" \
   -H "Content-Type: text/plain" \
   -d "$LIST" \
-  -w "\n%{http_code}" "${BASE_URL}/api/github/syncEnd")
+  -w "\n%{http_code}" "${CF_DOMAIN}/api/github/syncEnd")
 status=$(echo "$response" | tail -n1)
 body=$(echo "$response" | sed '$d')
 echo "X. Sync completed: ${status}: ${body}"

@@ -24,7 +24,7 @@ jobs:
 
       - name: Execute worker sync script
         env:
-          BASE_URL: ${{ vars.CF_DOMAIN }}
+          CF_DOMAIN: ${{ vars.CF_DOMAIN }}
           CF_GH_SECRET: ${{ secrets.CF_GH_SECRET }}
           COMMIT: true
         run: |

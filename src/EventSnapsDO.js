@@ -111,10 +111,10 @@ CREATE TABLE IF NOT EXISTS files (
   }
 
   syncStart() {
-    const res = this.sql.exec(`SELECT name FROM files ORDER BY id DESC`).toArray();
+    const res = this.sql.exec(`SELECT name FROM files ORDER BY id DESC`).toArray().map(r => `files/${encodeURIComponent(r.name)}`);
     const eventFile = this.getEventFileName();
     if (eventFile)
-      res.push(eventFile + ".json.gz");
+      res.push(`events/${eventFile}.json.gz`);
     if (!res.length)
       return "";
     res.push("snap.json");
