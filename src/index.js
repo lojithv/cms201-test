@@ -197,6 +197,7 @@ function getEndpoint(req, PATHS) {
 function settings(env) {
 	return {
 		origin: env.ORIGIN,
+		//todo 1. bug! env.OAUTH_USERS which is an array of emails. instead of USERS.
 		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
 		google: {
 			client_id: env.GOOGLE_ID,
@@ -255,6 +256,7 @@ async function onFetch(request, env, ctx) {
 				if (payload instanceof Promise)
 					payload = await payload;
 				user = payload?.email;
+				//to do 2. bug! check that user is in env.OAUTH_USERS
 				if (!user)
 					endPoint = UNSECURE_PATHS["GET /auth/login"];
 			}
