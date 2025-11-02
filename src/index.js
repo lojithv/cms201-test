@@ -88,6 +88,7 @@ const UNSECURE_PATHS = {
 			return new Response(`Authentication Failed!`, { status: 401 });
 		const tokenData = await tokenRes.json();
 		//todo doesn't the tokenData contain the state too? should we not read it from there?
+		
 		return new Response(null, {
 			status: 302, headers: {
 				"Location": state,
@@ -116,6 +117,9 @@ const SECURE_PATHS = {
 		return await DB(env).getEvents(req.url.pathname.split("/")[3]);
 	},
 	"GET /admin": function (req, env, ctx, user) {
+		return env.ASSETS.fetch(req);
+	},
+	"GET /test": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
 	},
 	"GET /data": async function (req, env, ctx, user) {
@@ -153,7 +157,7 @@ const SECURE_PATHS = {
 				'Authorization': `Bearer ${env.settings.github.pat}`,
 				'X-GitHub-Api-Version': '2022-11-28',
 				"Accept": "application/vnd.github+json",
-				'User-Agent': 'cms201-worker/1.0'
+				'User-Agent': 'project201-worker/1.0'
 			},
 			body: JSON.stringify({ ref: 'main' }),
 		});
@@ -199,6 +203,7 @@ function settings(env) {
 		origin: env.ORIGIN,
 		//todo 1. bug! env.OAUTH_USERS which is an array of emails. instead of USERS.
 		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
+		oauth_users: env.OAUTH_USERS.split(";"), // Oussama: Added this line
 		google: {
 			client_id: env.GOOGLE_ID,
 			client_secret: env.GOOGLE_SECRET,
@@ -258,6 +263,8 @@ async function onFetch(request, env, ctx) {
 				user = payload?.email;
 				//to do 2. bug! check that user is in env.OAUTH_USERS
 				if (!user)
+					endPoint = UNSECURE_PATHS["GET /auth/login"];
+				else if (!env.settings.oauth_users.includes(user))  // Oussama: Added these two lines
 					endPoint = UNSECURE_PATHS["GET /auth/login"];
 			}
 		}

@@ -1,37 +1,115 @@
-# cms201
+# CMS201 - Micro CMS on Cloudflare Workers
 
-## project files
+A lightweight, serverless Content Management System built on Cloudflare Workers with Durable Objects, featuring Google OAuth authentication, automatic GitHub backups, and real-time data synchronization.
 
-* `.github/workflows/`
-    * `workerEvents.yml`
-* `wrangler.jsonc`
-* `.gitignore`
-* `README.md`
-* `public/*` (static files)
-* `scripts/*` (serverside scripts)
-* `src/*` (worker code)
-* `data/*` (data files)
-    * `snap.json` (current state snapshot)
-    * `pages.json` (list of event pages)
-    * `events/` (folder with event files)
-    * `snaps/` (folder with snapshots matching event pages)
+## Architecture
 
-## HowTo: run locally
+**Serverless Edge Computing Stack:**
+- **Frontend**: Static HTML/CSS/JS served via Cloudflare Assets
+- **Backend**: Cloudflare Workers (JavaScript runtime at the edge)
+- **Database**: Durable Objects with SQLite (persistent, in-memory)
+- **Authentication**: Google OAuth 2.0
+- **Backup**: Automated GitHub sync via Actions
+- **File Storage**: Cloudflare Assets + GitHub repository
 
-To run the worker locally, use the commands:
-1. `npx wrangler dev --port 3033` (in the FIRST terminal console in project root folder)
+## Project Structure
 
-2. To test the GitHub sync script against your local worker:
+```
+cms201/
+├── .github/workflows/
+│   ├── syncWorkerFiles.yml    # Daily backup automation
+│   └── syncWorkerFiles.sh     # Sync script
+├── public/
+│   ├── admin/index.html       # Admin interface
+│   ├── test.html             # Comprehensive testing suite
+│   └── data/                 # Static data files
+├── src/
+│   ├── index.js              # Main worker entry point
+│   └── EventSnapsDO.js       # Durable Object implementation
+├── wrangler.jsonc            # Cloudflare Worker configuration
+└── .dev.vars                 # Local environment variables
+```
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+ and npm
+- Cloudflare account
+- GitHub account  
+- Google Cloud Console project (for OAuth)
+
+### Local Development
+1. **Clone and install:**
+   ```bash
+   git clone <your-repo>
+   cd cms201
+   npm install -g wrangler
+   ```
+
+2. **Configure environment variables:**
+   Copy `.dev.vars.example` to `.dev.vars` and fill in your values:
+   ```bash
+   cp .dev.vars.example .dev.vars
+   # Edit .dev.vars with your actual credentials
+   ```
+
+3. **Start local development server:**
+   ```bash
+   npx wrangler dev --port 3033
+   ```
+
+4. **Access the application:**
+   - **Homepage**: http://localhost:3033/
+   - **Admin Panel**: http://localhost:3033/admin
+   - **Test Suite**: http://localhost:3033/test.html
+
+### Testing GitHub Sync Locally
 ```bash
-CF_DOMAIN="http://127.0.0.1:3033" CF_GH_SECRET="hello sunshine" COMMIT="false" \
+CF_DOMAIN="http://127.0.0.1:3033" \
+CF_GH_SECRET="your_github_pat_token" \
+COMMIT="false" \
 bash .github/workflows/syncWorkerFiles.sh
 ```
 
-## overview 
+## API Endpoints
+
+### Public Endpoints
+- `GET /` - Homepage
+- `GET /api/snap` - Current state snapshot
+- `GET /api/snap/notNull` - Filtered state snapshot
+- `GET /api/uploaded-images` - List uploaded images
+
+### Authentication Endpoints  
+- `GET /auth/login` - Initiate Google OAuth
+- `GET /auth/callback` - OAuth callback handler
+- `GET /auth/logout` - Logout user
+- `GET /auth/checkLogin` - Check authentication status
+
+### Authenticated Endpoints (Require Login)
+- `GET /admin` - Admin interface
+- `GET /api/events` - List all events
+- `POST /api/addEvent` - Create new event
+- `POST /api/addFile` - Upload file
+- `GET /api/uploadImageURL` - Get image upload URL
+- `GET /api/backup` - Trigger GitHub backup
+
+### GitHub Sync Endpoints (Require PAT Token)
+- `GET /api/github/syncStart` - Start sync process
+- `POST /api/github/syncEnd` - Complete sync process  
+- `GET /api/github/readFile/{path}` - Read file from storage
+
+### Data Access Endpoints
+- `GET /data/{filename}` - Access stored files
+- `GET /api/readFile/{filename}` - Read specific file
+
+## Overview 
 
 Below is a receipe for how to replicate this project from scratch. It involves a mix of manual steps and scripts. The goal is to have a fully working Cloudflare Worker project that uses Google OAuth for authentication, GitHub for version control, and Cloudflare Pages for deployment. The project also includes a system for tracking changes and creating snapshots of data.
 
 ## .dev.vars
+
+<!-- Oussama: Added <username> to GITHUB_WORKFLOW url -->
+<!-- Oussama: Added ${username} to <cloudfare link> -->
 
 ```
 ORIGIN="http://127.0.0.1:3033"
@@ -41,12 +119,12 @@ GOOGLE_SECRET="GOCSPX-12345"
 GOOGLE_REDIRECT="http://127.0.0.1:3033/auth/callback"
 # GOOGLE_REDIRECT="<cloudflare link>/auth/callback"
 
-CF_DOMAIN="<projectname>.workers.dev"
+CF_DOMAIN="<projectname>.<username>.workers.dev"
 IMAGE_SERVER_ACCOUNT_ID="12345"
 IMAGE_SERVER_API_TOKEN="12345"
 
 GITHUB_REPO="orstavik/cms201"
-GITHUB_WORKFLOW="https://api.github.com/repos/<reponame>/actions/workflows/syncWorkerFiles/dispatches"
+GITHUB_WORKFLOW="https://api.github.com/repos/<username>/<reponame>/actions/workflows/syncWorkerFiles/dispatches" 
 
 CF_GH_SECRET="github_pat_12345"
 GITHUB_TTL="300" 
@@ -75,7 +153,7 @@ check for conflicts, and then create accounts when needed.
     2. Select "External", name: `"${projectname}$ oauth client"`, user support: `${gmail}`, developer contact: `${gmail}`, and save. 
     3. Then go to "Credentials" > "Create Credentials" > "OAuth Client ID". 
     4. Select "Web application", give it a name: `"${projectname} oauth client"`, and add the following authorized redirect URIs:
-        - `https://${projectname}$.workers.dev/auth/callback`
+        - `https://${projectname}.${username}.workers.dev/auth/callback`
         - `http://localhost:3033/api/auth/callback`
         - `http://127.0.0.1:3033/api/auth/callback`
 => google auth client id 
@@ -103,11 +181,11 @@ at this point, should we make the .dev.vars file?? In one place.
 8. Update github environment variable DOMAIN.
     1. Go to https://github.com/${GITHUB_REPO}$/settings/secrets/actions
     2. Click "New repository secret"
-        * Name: `DOMAIN`, => value: `${projectname}.workers.dev`
+        * Name: `CF_DOMAIN`, => value: `${projectname}.${username}.workers.dev`
     3. Name: `production`
     4. Click "Configure environment"
     5. Click "Add variable"
-        * Name: `DOMAIN`, => value: `${projectname}.workers.dev`
+        * Name: `CF_DOMAIN`, => value: `${projectname}.${username}.workers.dev`
     6. Click "Save variables"
 8. Update Cloudflare enviroment variables:
     1. Go to dash.cloudflare.com
@@ -118,7 +196,7 @@ at this point, should we make the .dev.vars file?? In one place.
         * Name: `OAUTH_CLIENT_SECRET`, `Secret`, => value: `google auth secret`
         * Name: `EMAIL`, `Text`, => value: `gmail`
         * Name: `PROJECT_NAME`, `Text`, => value: `${projectname}`
-        * Name: `DOMAIN`, `Text`, => value: `${projectname}.workers.dev`
+        * Name: `CF_DOMAIN`, `Text`, => value: `${projectname}.${username}.workers.dev`
         * Name: `REPO`, `Text`, => value: `${githubusername}/${projectname}`
     4. Click "Save"
 
@@ -130,7 +208,8 @@ at this point, should we make the .dev.vars file?? In one place.
 1. change the project name in `wrangler.jsonc` and `README.md` to `${projectname}`.
 2. commit the repo to github as a new repo with the name ${projectname}.
 2. Wait for 1min??
-3. fetch `https://${projectname}.workers.dev/startup`. Make sure that it returns the same state as in the snapshot.json inside make sure that it returns the same value as was in the `data` branch commit.
+<!-- Update "snapshot.json" to "snap.json" -->
+3. fetch `https://${projectname}.${username}.workers.dev/startup`. Make sure that it returns the same state as in the snap.json inside make sure that it returns the same value as was in the `data` branch commit.
 
 ## Data structure
 
@@ -144,7 +223,33 @@ at this point, should we make the .dev.vars file?? In one place.
 2. `#currentState`. The last up-to-date version of the `{snap, lastEventId, pages}`.
 3. `files`. files stored in the sqlite that is not yet pushed to github/ASSETS.
 
-## How to timetravel using Github data?
+## Testing Suite
+
+### Comprehensive Test Interface (`/test.html`)
+The project includes a comprehensive testing suite that validates all endpoints and functionality:
+
+**Features:**
+- **Visual iframe navigation** - See actual pages loading during tests
+- **Real authentication support** - Input actual session tokens from Google OAuth
+- **Simulation mode** - Test without real authentication
+- **Admin form interaction** - Actually fills out and submits admin forms
+- **Complete API coverage** - Tests all public, authenticated, and GitHub sync endpoints
+- **Live commentary** - Real-time logging of all test operations
+
+**Authentication Options:**
+1. **Real Session Token**: After logging in via `/auth/login`, copy your session token and paste it into the test interface for real authentication testing
+2. **Simulation Mode**: Use simulated authentication for testing without real login
+
+### Manual Testing Workflow
+1. Start local development: `npx wrangler dev --port 3033`
+2. Open test suite: http://localhost:3033/test.html
+3. Choose authentication method (real token or simulation)
+4. Run comprehensive tests or individual endpoint tests
+5. Monitor visual iframe and logs for results
+
+## Data Synchronization
+
+### How to timetravel using Github data?
 
 The worker's memory limit is ~30mb. Hence, history and timetravel is done page by page in the browser.
 1. Browser fetches `/data/files.json` from Worker.

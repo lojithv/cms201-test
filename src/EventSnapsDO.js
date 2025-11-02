@@ -84,11 +84,13 @@ CREATE TABLE IF NOT EXISTS files (
           'Content-Disposition': `attachment; filename="${filename}"`
         }
       });
-    } else if (type == "snap.json") {
+    // } else if (type == "snap.json") {
+    } else if (type == "snap.json" || type == "files.json") { // Oussama: Added second condition
       return new Response(JSON.stringify(this.#currentState.snap), {
         headers: {
           'Content-Type': 'application/json',
-          'Content-Disposition': 'attachment; filename="snap.json"'
+          // 'Content-Disposition': 'attachment; filename="snap.json"'
+          'Content-Disposition': `attachment; filename="${filename}"` // Oussama: update this to use filename instead of snap.json (can use type instead of filename too)
         }
       });
     }

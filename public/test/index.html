@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMS201 Test Suite</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f8f9fa;
+            color: #333;
+        }
+        .test-section { 
+            margin: 0px 0 20px 0; 
+            padding: 20px; 
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .log { 
+            background: #2d3748; 
+            color: #e2e8f0;
+            padding: 15px; 
+            height: 400px; 
+            overflow-y: scroll; 
+            font-family: 'Consolas', 'Monaco', monospace;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .success { color: #48bb78; font-weight: bold; }
+        .error { color: #f56565; font-weight: bold; }
+        .info { color: #4299e1; }
+        .warning { color: #ed8936; }
+        button { 
+            margin: 5px; 
+            padding: 12px 20px; 
+            background: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        button:hover { 
+            background: #3182ce; 
+            transform: translateY(-1px);
+        }
+        button:active { transform: translateY(0); }
+        .btn-success { background: #48bb78; }
+        .btn-success:hover { background: #38a169; }
+        .btn-danger { background: #f56565; }
+        .btn-danger:hover { background: #e53e3e; }
+        .btn-secondary { background: #718096; }
+        .btn-secondary:hover { background: #4a5568; }
+        iframe { width: 100%; height: 400px; border: 1px solid #e2e8f0; border-radius: 6px; }
+        .hidden { display: none; }
+        .visual-iframe { 
+            width: 100%; 
+            height: 500px; 
+            border: 2px solid #4299e1; 
+            border-radius: 8px;
+            background: white;
+        }
+        .iframe-container { 
+            position: relative; 
+            background: #f7fafc;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .iframe-overlay { 
+            position: absolute; 
+            top: 20px; 
+            left: 20px; 
+            background: rgba(45, 55, 72, 0.95); 
+            color: white; 
+            padding: 8px 15px; 
+            border-radius: 6px; 
+            font-size: 13px; 
+            z-index: 10;
+            font-weight: 500;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .test-layout { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+        }
+        @media (max-width: 1200px) { 
+            .test-layout { grid-template-columns: 1fr; } 
+        }
+        .login-simulator {
+            background: #edf2f7;
+            border: 2px dashed #a0aec0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background: #48bb78; }
+        .status-error { background: #f56565; }
+        .status-pending { background: #ed8936; }
+        .status-info { background: #4299e1; }
+    </style>
+</head>
+<body>    
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <div style="margin-bottom: 15px;">
+            <button onclick="runAllTests()" id="runAllBtn">Run All Tests</button>
+            <button onclick="clearLog()" class="btn-secondary">Clear Log</button>
+            <button onclick="checkAuth()" class="btn-secondary">Check Auth Status</button>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <strong>Individual Test Categories:</strong><br>
+            <button onclick="testPublicEndpoints()" class="btn-secondary">Test Public APIs</button>
+            <button onclick="testAuthEndpoints()" class="btn-secondary">Test Auth APIs</button>
+        </div>
+        
+        <div>
+            <strong>Visual Navigation:</strong><br>
+            <button onclick="navigateIframe('/')" class="btn-secondary">Home</button>
+            <button onclick="navigateIframe('/admin')" class="btn-secondary">Admin Panel</button>
+            <button onclick="navigateIframe('/auth/login')" class="btn-secondary">Login Page</button>
+            <button onclick="navigateIframe('/api/snap')" class="btn-secondary">View Data</button>
+            <button onclick="navigateIframe('/api/events')" class="btn-secondary">Events List</button>
+            <button onclick="testAdminInteractive()" class="btn-success">Test Admin (Interactive)</button>
+            <button onclick="testEndpoint('/api/snap', 'GET', null, 'Snap API test', true)" class="btn-success">Test API (Visual)</button>
+        </div>
+    </div> 
+
+    <div class="test-layout">
+        <div class="test-section">
+            <h2>Test Results</h2>
+            <div id="testLog" class="log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Visual CMS Navigation</h2>
+            <div class="iframe-container">
+                <div id="iframeOverlay" class="iframe-overlay">Ready to navigate...</div>
+                <iframe id="visualIframe" class="visual-iframe" src="/"></iframe>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        let testResults = [];
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('testLog');
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'info';
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('testLog').innerHTML = '';
+            testResults = [];
+        }
+
+        async function checkAuth() {
+            log("Checking authentication status...");
+            
+            try {
+                const response = await fetch('/auth/checkLogin');
+                const text = await response.text();
+                if (response.ok && text.includes('@')) {
+                    log(`Authentication confirmed: ${text}`, 'success');
+                    return true;
+                } else {
+                    log("Not authenticated", 'error');
+                    return false;
+                }
+            } catch (error) {
+                log(`Auth check failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function checkRealAuthentication() {
+            try {
+                const response = await fetch('/auth/checkLogin');
+                const text = await response.text();
+                if (response.ok && text.includes('@')) {
+                    log(`Real authentication confirmed: ${text}`, 'success');
+                    return true;
+                } else {
+                    return false;
+                }
+            } catch (error) {
+                log(`Real auth check failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+
+        // Visual iframe navigation functions
+        function navigateIframe(url) {
+            const iframe = document.getElementById('visualIframe');
+            const overlay = document.getElementById('iframeOverlay');
+            
+            overlay.textContent = `Navigating to: ${url}`;
+            log(`Visual navigation: ${url}`, 'info');
+            
+            iframe.src = url;
+            
+            // Update overlay after a delay to show "loaded"
+            setTimeout(() => {
+                overlay.textContent = `Viewing: ${url}`;
+            }, 1000);
+        }
+
+        function updateIframeOverlay(message) {
+            document.getElementById('iframeOverlay').textContent = message;
+        }
+
+        // Simulate real admin page form interactions
+        async function simulateAdminInteractions() {
+            log("Starting real admin page form interactions...");
+            updateIframeOverlay("Loading admin interface...");
+            
+            // Navigate to admin page
+            navigateIframe('/admin');
+            await new Promise(resolve => setTimeout(resolve, 2200));
+            
+            // Wait for page to fully load
+            log("Waiting for admin page to fully load...");
+            updateIframeOverlay("Admin page loaded - preparing form interactions...");
+            await new Promise(resolve => setTimeout(resolve, 1650));
+            
+            // Interact with the event form
+            log("Interacting with event creation form...");
+            updateIframeOverlay("Filling out event form...");
+            await simulateEventFormInteraction();
+            await new Promise(resolve => setTimeout(resolve, 1650));
+            
+            // Interact with the file upload form  
+            log("Interacting with file upload form...");
+            updateIframeOverlay("Preparing file upload...");
+            await simulateFileUploadFormInteraction();
+            await new Promise(resolve => setTimeout(resolve, 1650));
+            
+            // Test the admin links
+            log("Testing admin navigation links...");
+            updateIframeOverlay("Testing admin links...");
+            await testAdminLinks();
+            await new Promise(resolve => setTimeout(resolve, 1100));
+            
+            log("Admin form interactions complete");
+            updateIframeOverlay("All admin interactions completed");
+        }
+
+        // Simulate event form interaction
+        async function simulateEventFormInteraction() {
+            try {
+                const iframe = document.getElementById('visualIframe');
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                log("Locating event form textarea...");
+                updateIframeOverlay("Finding event form...");
+                await new Promise(resolve => setTimeout(resolve, 880));
+                
+                // Find the textarea and form
+                const textarea = iframeDoc.querySelector('textarea[name="events"]');
+                const form = iframeDoc.querySelector('form[action="/api/addEvent"]');
+                const submitButton = form?.querySelector('button');
+                
+                if (textarea && form && submitButton) {
+                    log("Found event form - modifying content...");
+                    updateIframeOverlay("Editing event JSON in form...");
+                    
+                    // Simulate typing new content
+                    const newEventData = JSON.stringify({
+                        "test_event_from_form": {
+                            "timestamp": Date.now(),
+                            "source": "admin_form_submission",
+                            "message": "Event created by submitting admin form",
+                            "user_simulation": true
+                        }
+                    }, null, 2);
+                    
+                    textarea.value = newEventData;
+                    log("Event form content updated - clicking submit button...");
+                    updateIframeOverlay("Submitting event form...");
+                    
+                    // Actually click the submit button in the form
+                    await new Promise(resolve => setTimeout(resolve, 1100)); // Wait to see the change
+                    submitButton.click();
+                    log("Event form submitted successfully via button click");
+                    
+                    // Wait to see the result
+                    await new Promise(resolve => setTimeout(resolve, 1650));
+                } else {
+                    log("Event form elements not found - form may not be loaded yet", 'warning');
+                    updateIframeOverlay("Event form not ready");
+                }
+            } catch (error) {
+                log(`Form interaction error: ${error.message}`, 'warning');
+                updateIframeOverlay("Event form interaction failed");
+            }
+        }
+
+        // Simulate file upload form interaction
+        async function simulateFileUploadFormInteraction() {
+            try {
+                const iframe = document.getElementById('visualIframe');
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                log("Locating file upload form...");
+                updateIframeOverlay("Finding file upload form...");
+                await new Promise(resolve => setTimeout(resolve, 880));
+                
+                // Find the file form elements
+                const form = iframeDoc.querySelector('form[action="/api/addFile"]');
+                const fileInput = iframeDoc.querySelector('input[type="file"]');
+                const filenameInput = iframeDoc.querySelector('input[name="filename"]');
+                const contentTypeInput = iframeDoc.querySelector('input[name="contentType"]');
+                const submitButton = form?.querySelector('button');
+                
+                if (form && filenameInput && contentTypeInput && submitButton) {
+                    log("Found file form - filling out fields...");
+                    updateIframeOverlay("Filling file upload form...");
+                    
+                    // Simulate filling out the form fields
+                    filenameInput.value = 'admin_form_test.txt';
+                    contentTypeInput.value = 'text/plain';
+                    
+                    log("File form fields filled out successfully");
+                    updateIframeOverlay("Form fields filled - demonstrating file upload...");
+                    
+                    // Since we can't set file input programmatically, demonstrate with API call
+                    log("Demonstrating file upload via API (form would work with real file selection)", 'info');
+                    
+                    // Create a test file and upload it via API to show the functionality
+                    const formData = new FormData();
+                    const testFile = new Blob(['Test file content from admin form interaction'], { type: 'text/plain' });
+                    formData.append('file', testFile, 'admin_form_test.txt');
+                    formData.append('filename', 'admin_form_test.txt');
+                    formData.append('contentType', 'text/plain');
+                    
+                    await testEndpoint('/api/addFile', 'POST', formData, 'File upload demonstration');
+                    
+                    log("File upload demonstration complete - form interaction successful");
+                    
+                } else {
+                    log("File form elements not found - form may not be loaded yet", 'warning');
+                    updateIframeOverlay("File form not ready");
+                }
+            } catch (error) {
+                log(`File form interaction error: ${error.message}`, 'warning');
+                updateIframeOverlay("File form interaction failed");
+            }
+        }
+
+        // Test admin navigation links
+        async function testAdminLinks() {
+            log("Testing admin navigation links...");
+            
+            // Test the main navigation links from admin page
+            const adminLinks = [
+                { url: '/auth/checkLogin', desc: 'Check login status' },
+                { url: '/api/events', desc: 'View all events' },
+                { url: '/api/backup', desc: 'Trigger backup' }
+            ];
+            
+            for (const link of adminLinks) {
+                log(`Testing admin link: ${link.desc}`);
+                updateIframeOverlay(`Testing: ${link.desc}`);
+                await testEndpoint(link.url, 'GET', null, link.desc);
+                await new Promise(resolve => setTimeout(resolve, 880));
+            }
+        }
+
+        async function testEndpoint(url, method = 'GET', body = null, description = '', showVisual = false) {
+            log(`Testing ${method} ${url} - ${description}`);
+            
+            // Show visual navigation for certain endpoints
+            if (showVisual || url.startsWith('/admin') || url.startsWith('/auth') || url === '/') {
+                updateIframeOverlay(`Testing: ${method} ${url}`);
+                navigateIframe(url);
+                await new Promise(resolve => setTimeout(resolve, 1650)); // Wait for navigation (10% slower)
+            }
+            
+            try {
+                const options = { method };
+                
+                // Authentication is handled by browser cookies automatically
+                
+                if (body) {
+                    if (body instanceof FormData) {
+                        options.body = body;
+                    } else {
+                        options.headers = { 
+                            'Content-Type': 'application/json',
+                            ...(options.headers || {})
+                        };
+                        options.body = JSON.stringify(body);
+                    }
+                }
+
+                const response = await fetch(url, options);
+                const contentType = response.headers.get('content-type');
+                
+                let responseData;
+                if (contentType && contentType.includes('application/json')) {
+                    responseData = await response.json();
+                } else {
+                    responseData = await response.text();
+                }
+
+                if (response.ok) {
+                    log(`SUCCESS ${method} ${url} (${response.status})`, 'success');
+                    if (typeof responseData === 'object') {
+                        log(`   Response: ${JSON.stringify(responseData).substring(0, 200)}...`);
+                    } else {
+                        log(`   Response: ${responseData.substring(0, 200)}...`);
+                    }
+                    testResults.push({ url, method, status: response.status, success: true });
+                    
+                    // Show success in iframe overlay
+                    if (showVisual || url.startsWith('/admin') || url.startsWith('/auth') || url === '/') {
+                        updateIframeOverlay(`SUCCESS ${method} ${url}`);
+                    }
+                    
+                    return { success: true, data: responseData };
+                } else {
+                    log(`FAILED ${method} ${url} (${response.status}): ${responseData}`, 'error');
+                    testResults.push({ url, method, status: response.status, success: false, error: responseData });
+                    
+                    // Show error in iframe overlay
+                    if (showVisual || url.startsWith('/admin') || url.startsWith('/auth') || url === '/') {
+                        updateIframeOverlay(`FAILED ${method} ${url}`);
+                    }
+                    
+                    return { success: false, error: responseData };
+                }
+            } catch (error) {
+                log(`ERROR ${method} ${url}: ${error.message}`, 'error');
+                testResults.push({ url, method, success: false, error: error.message });
+                
+                // Show error in iframe overlay
+                if (showVisual || url.startsWith('/admin') || url.startsWith('/auth') || url === '/') {
+                    updateIframeOverlay(`ERROR ${method} ${url}`);
+                }
+                
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function runAllTests() {
+            log("Starting CMS201 comprehensive test suite...");
+            clearLog();
+            updateIframeOverlay("Starting comprehensive test suite...");
+            
+            // Step 0: Show home page
+            log("Navigating to home page...");
+            navigateIframe('/');
+            await new Promise(resolve => setTimeout(resolve, 2200)); // 10% slower
+            
+            // Step 0.5: Demonstrate Google OAuth blocking
+            log("Demonstrating Google OAuth iframe blocking...");
+            updateIframeOverlay("Attempting to load Google OAuth in iframe...");
+            navigateIframe('/auth/login');
+            await new Promise(resolve => setTimeout(resolve, 3300)); // 10% slower
+            
+            log("Google OAuth blocks iframe embedding (X-Frame-Options: DENY)", 'warning');
+            log("This is why we need the login simulator for testing", 'info');
+            updateIframeOverlay("Google OAuth blocked - using simulator instead");
+            await new Promise(resolve => setTimeout(resolve, 2200)); // 10% slower
+            
+            // Navigate back to home
+            log("Navigating back to continue testing...");
+            navigateIframe('/');
+            await new Promise(resolve => setTimeout(resolve, 1650)); // 10% slower
+            
+            // Step 1: Check real authentication status
+            log("Checking if user is already authenticated...");
+            updateIframeOverlay("Checking authentication status...");
+            const isAuthenticated = await checkRealAuthentication();
+            
+            if (!isAuthenticated) {
+                log("No authenticated user found!", 'error');
+                log("AUTHENTICATION REQUIRED:", 'warning');
+                log("1. Open a new tab and go to: " + window.location.origin + "/auth/login", 'info');
+                log("2. Complete Google OAuth login", 'info');
+                log("3. Return to this tab and click 'Run All Tests' again", 'info');
+                log("Test suite stopped - please authenticate first", 'warning');
+                updateIframeOverlay("Authentication required - see logs for instructions");
+                return;
+            }
+            
+            log("User authenticated - continuing with tests...", 'success');
+
+            // Step 1.5: Comprehensive admin interface testing
+            log("Starting comprehensive admin interface testing...");
+            await simulateAdminInteractions();
+            await new Promise(resolve => setTimeout(resolve, 1650)); // 10% slower
+
+            // Step 2: Test public endpoints with visual navigation
+            log("Testing public API endpoints...");
+            navigateIframe('/');
+            await new Promise(resolve => setTimeout(resolve, 1650));
+            await testEndpoint('/api/snap', 'GET', null, 'Getting current state snapshot', true);
+            await new Promise(resolve => setTimeout(resolve, 1100));
+            await testEndpoint('/api/snap/notNull', 'GET', null, 'Getting filtered state snapshot');
+            await new Promise(resolve => setTimeout(resolve, 1100));
+            await testEndpoint('/api/uploaded-images', 'GET', null, 'Fetching uploaded images list');
+            await new Promise(resolve => setTimeout(resolve, 1100));
+
+            // Step 3: Test remaining authenticated endpoints
+            log("Testing remaining authenticated API endpoints...");
+            await testEndpoint('/api/events', 'GET', null, 'Fetching all events (including form-created ones)');
+            await new Promise(resolve => setTimeout(resolve, 1100));
+
+            // Test image upload URL generation
+            await testEndpoint('/api/uploadImageURL?path=test-image', 'GET', null, 'Getting image upload URL');
+            await new Promise(resolve => setTimeout(resolve, 1100));
+
+            // Test backup trigger
+            await testEndpoint('/api/backup', 'GET', null, 'Triggering GitHub backup');
+            await new Promise(resolve => setTimeout(resolve, 1100));
+
+            // Step 4: Test GitHub sync endpoints (these require GitHub PAT)
+            log("Testing GitHub sync endpoints...");
+            await testEndpoint('/api/github/syncStart', 'GET', null, 'Starting GitHub sync');
+            await new Promise(resolve => setTimeout(resolve, 1100));
+            
+            // Step 5: Test file reading endpoints
+            log("Testing file reading endpoints...");
+            await testEndpoint('/api/readFile/snap.json', 'GET', null, 'Reading snap.json file');
+            await new Promise(resolve => setTimeout(resolve, 1100));
+
+            // Step 6: Verify all created content
+            log("Verifying all created content...");
+            updateIframeOverlay("Verifying created content...");
+            await testEndpoint('/api/events', 'GET', null, 'Final verification of all events');
+            await new Promise(resolve => setTimeout(resolve, 1100));
+
+            // Step 7: Final comprehensive navigation demo
+            log("Final comprehensive navigation demonstration...");
+            updateIframeOverlay("Final demo: Complete CMS tour");
+            
+            const demoPages = [
+                { url: '/', desc: 'Home page with public content' },
+                { url: '/admin', desc: 'Admin interface with forms' },
+                { url: '/api/snap', desc: 'Current system state' },
+                { url: '/api/events', desc: 'All created events' }
+            ];
+            
+            for (const page of demoPages) {
+                log(`Final demo: ${page.desc}`);
+                updateIframeOverlay(`Demo: ${page.desc}`);
+                navigateIframe(page.url);
+                await new Promise(resolve => setTimeout(resolve, 2200)); // 10% slower
+            }
+
+            // Step 8: Generate comprehensive summary
+            log("Comprehensive Test Summary:");
+            const successful = testResults.filter(r => r.success).length;
+            const failed = testResults.filter(r => !r.success).length;
+            log(`Total tests executed: ${testResults.length}`, 'info');
+            log(`Successful tests: ${successful}`, 'success');
+            log(`Failed tests: ${failed}`, failed > 0 ? 'error' : 'info');
+            
+            updateIframeOverlay(`Complete: ${successful}/${testResults.length} tests passed`);
+            
+            if (failed === 0) {
+                log("All tests passed! CMS is fully functional with admin interactions.", 'success');
+                navigateIframe('/admin'); // End on admin page
+            } else {
+                log("Some tests failed. Review the detailed log above.", 'warning');
+            }
+        }
+
+        // Test individual endpoint categories
+        async function testPublicEndpoints() {
+            log("Testing public endpoints only...");
+            updateIframeOverlay("Testing public endpoints...");
+            navigateIframe('/');
+            await new Promise(resolve => setTimeout(resolve, 1650)); // 10% slower
+            await testEndpoint('/api/snap', 'GET', null, 'Public snap endpoint', true);
+            await new Promise(resolve => setTimeout(resolve, 1100));
+            await testEndpoint('/api/snap/notNull', 'GET', null, 'Public filtered snap');
+        }
+
+        async function testAuthEndpoints() {
+            log("Testing authenticated endpoints...");
+            const isAuth = await checkAuth();
+            if (!isAuth) {
+                log("Authentication required - please login first", 'warning');
+                log("Open new tab: " + window.location.origin + "/auth/login", 'info');
+                return;
+            }
+            updateIframeOverlay("Testing authenticated endpoints...");
+            navigateIframe('/admin');
+            await new Promise(resolve => setTimeout(resolve, 1650));
+            await testEndpoint('/api/events', 'GET', null, 'Events endpoint');
+            await new Promise(resolve => setTimeout(resolve, 1100));
+            await testEndpoint('/api/addEvent', 'POST', {test: Date.now()}, 'Add event');
+        }
+
+        // Interactive admin testing function
+        async function testAdminInteractive() {
+            log("Starting interactive admin testing...");
+            const isAuth = await checkAuth();
+            if (!isAuth) {
+                log("Authentication required - please login first", 'warning');
+                log("Open new tab: " + window.location.origin + "/auth/login", 'info');
+                return;
+            }
+            
+            // Use the same comprehensive admin testing as runAllTests
+            await simulateAdminInteractions();
+        }
+
+        // Initialize
+        log("CMS201 Test Suite Ready");
+        log("Click 'Run All Tests' to begin comprehensive testing");
+        log("Authenticate via /auth/login for full functionality");
+    </script>
+
+
+</body>
+</html>
