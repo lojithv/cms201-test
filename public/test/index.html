@@ -501,7 +501,7 @@
             await new Promise(resolve => setTimeout(resolve, 1100));
 
             checkAbort();
-            await testEndpoint('/api/uploadImageURL?path=test-image', 'GET', null, 'Getting image upload URL');
+            await testEndpoint(`/api/uploadImageURL?path=test-image-${Date.now()}`, 'GET', null, 'Getting image upload URL');
             await new Promise(resolve => setTimeout(resolve, 1100));
 
             checkAbort();
