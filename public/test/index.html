@@ -118,6 +118,7 @@
         <h2>Test Controls</h2>
         <div style="margin-bottom: 15px;">
             <button onclick="runAllTests()" id="runAllBtn">Run All Tests</button>
+            <button onclick="stopTests()" id="stopBtn" class="btn-danger" style="display:none;">Stop Tests</button>
             <button onclick="clearLog()" class="btn-secondary">Clear Log</button>
             <button onclick="checkAuth()" class="btn-secondary">Check Auth Status</button>
         </div>
@@ -158,6 +159,7 @@
 
     <script>
         let testResults = [];
+        let testAborted = false;
         
         function log(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
@@ -172,43 +174,40 @@
             testResults = [];
         }
 
-        async function checkAuth() {
-            log("Checking authentication status...");
+        function stopTests() {
+            testAborted = true;
+            log("Tests stopped by user", 'warning');
+            updateIframeOverlay("Tests aborted");
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('runAllBtn').style.display = 'inline-block';
+        }
+
+        function checkAbort() {
+            if (testAborted) {
+                throw new Error('Tests aborted by user');
+            }
+        }
+
+        async function checkAuth(silent = false) {
+            if (!silent) log("Checking authentication status...");
             
             try {
                 const response = await fetch('/auth/checkLogin');
                 const text = await response.text();
                 if (response.ok && text.includes('@')) {
-                    log(`Authentication confirmed: ${text}`, 'success');
+                    if (!silent) log(`Authentication confirmed: ${text}`, 'success');
                     return true;
                 } else {
-                    log("Not authenticated", 'error');
+                    if (!silent) log("Not authenticated", 'error');
                     return false;
                 }
             } catch (error) {
-                log(`Auth check failed: ${error.message}`, 'error');
-                return false;
-            }
-        }
-
-        async function checkRealAuthentication() {
-            try {
-                const response = await fetch('/auth/checkLogin');
-                const text = await response.text();
-                if (response.ok && text.includes('@')) {
-                    log(`Real authentication confirmed: ${text}`, 'success');
-                    return true;
-                } else {
-                    return false;
-                }
-            } catch (error) {
-                log(`Real auth check failed: ${error.message}`, 'error');
+                if (!silent) log(`Auth check failed: ${error.message}`, 'error');
                 return false;
             }
         }
 
 
-        // Visual iframe navigation functions
         function navigateIframe(url) {
             const iframe = document.getElementById('visualIframe');
             const overlay = document.getElementById('iframeOverlay');
@@ -218,7 +217,6 @@
             
             iframe.src = url;
             
-            // Update overlay after a delay to show "loaded"
             setTimeout(() => {
                 overlay.textContent = `Viewing: ${url}`;
             }, 1000);
@@ -228,33 +226,27 @@
             document.getElementById('iframeOverlay').textContent = message;
         }
 
-        // Simulate real admin page form interactions
         async function simulateAdminInteractions() {
             log("Starting real admin page form interactions...");
             updateIframeOverlay("Loading admin interface...");
             
-            // Navigate to admin page
             navigateIframe('/admin');
             await new Promise(resolve => setTimeout(resolve, 2200));
             
-            // Wait for page to fully load
             log("Waiting for admin page to fully load...");
             updateIframeOverlay("Admin page loaded - preparing form interactions...");
             await new Promise(resolve => setTimeout(resolve, 1650));
             
-            // Interact with the event form
             log("Interacting with event creation form...");
             updateIframeOverlay("Filling out event form...");
             await simulateEventFormInteraction();
             await new Promise(resolve => setTimeout(resolve, 1650));
             
-            // Interact with the file upload form  
             log("Interacting with file upload form...");
             updateIframeOverlay("Preparing file upload...");
             await simulateFileUploadFormInteraction();
             await new Promise(resolve => setTimeout(resolve, 1650));
             
-            // Test the admin links
             log("Testing admin navigation links...");
             updateIframeOverlay("Testing admin links...");
             await testAdminLinks();
@@ -264,7 +256,6 @@
             updateIframeOverlay("All admin interactions completed");
         }
 
-        // Simulate event form interaction
         async function simulateEventFormInteraction() {
             try {
                 const iframe = document.getElementById('visualIframe');
@@ -274,7 +265,6 @@
                 updateIframeOverlay("Finding event form...");
                 await new Promise(resolve => setTimeout(resolve, 880));
                 
-                // Find the textarea and form
                 const textarea = iframeDoc.querySelector('textarea[name="events"]');
                 const form = iframeDoc.querySelector('form[action="/api/addEvent"]');
                 const submitButton = form?.querySelector('button');
@@ -283,7 +273,6 @@
                     log("Found event form - modifying content...");
                     updateIframeOverlay("Editing event JSON in form...");
                     
-                    // Simulate typing new content
                     const newEventData = JSON.stringify({
                         "test_event_from_form": {
                             "timestamp": Date.now(),
@@ -297,12 +286,10 @@
                     log("Event form content updated - clicking submit button...");
                     updateIframeOverlay("Submitting event form...");
                     
-                    // Actually click the submit button in the form
-                    await new Promise(resolve => setTimeout(resolve, 1100)); // Wait to see the change
+                    await new Promise(resolve => setTimeout(resolve, 1100));
                     submitButton.click();
                     log("Event form submitted successfully via button click");
                     
-                    // Wait to see the result
                     await new Promise(resolve => setTimeout(resolve, 1650));
                 } else {
                     log("Event form elements not found - form may not be loaded yet", 'warning');
@@ -314,7 +301,6 @@
             }
         }
 
-        // Simulate file upload form interaction
         async function simulateFileUploadFormInteraction() {
             try {
                 const iframe = document.getElementById('visualIframe');
@@ -324,7 +310,6 @@
                 updateIframeOverlay("Finding file upload form...");
                 await new Promise(resolve => setTimeout(resolve, 880));
                 
-                // Find the file form elements
                 const form = iframeDoc.querySelector('form[action="/api/addFile"]');
                 const fileInput = iframeDoc.querySelector('input[type="file"]');
                 const filenameInput = iframeDoc.querySelector('input[name="filename"]');
@@ -335,17 +320,13 @@
                     log("Found file form - filling out fields...");
                     updateIframeOverlay("Filling file upload form...");
                     
-                    // Simulate filling out the form fields
                     filenameInput.value = 'admin_form_test.txt';
                     contentTypeInput.value = 'text/plain';
                     
                     log("File form fields filled out successfully");
                     updateIframeOverlay("Form fields filled - demonstrating file upload...");
                     
-                    // Since we can't set file input programmatically, demonstrate with API call
                     log("Demonstrating file upload via API (form would work with real file selection)", 'info');
-                    
-                    // Create a test file and upload it via API to show the functionality
                     const formData = new FormData();
                     const testFile = new Blob(['Test file content from admin form interaction'], { type: 'text/plain' });
                     formData.append('file', testFile, 'admin_form_test.txt');
@@ -366,11 +347,9 @@
             }
         }
 
-        // Test admin navigation links
         async function testAdminLinks() {
             log("Testing admin navigation links...");
             
-            // Test the main navigation links from admin page
             const adminLinks = [
                 { url: '/auth/checkLogin', desc: 'Check login status' },
                 { url: '/api/events', desc: 'View all events' },
@@ -388,17 +367,14 @@
         async function testEndpoint(url, method = 'GET', body = null, description = '', showVisual = false) {
             log(`Testing ${method} ${url} - ${description}`);
             
-            // Show visual navigation for certain endpoints
             if (showVisual || url.startsWith('/admin') || url.startsWith('/auth') || url === '/') {
                 updateIframeOverlay(`Testing: ${method} ${url}`);
                 navigateIframe(url);
-                await new Promise(resolve => setTimeout(resolve, 1650)); // Wait for navigation (10% slower)
+                await new Promise(resolve => setTimeout(resolve, 1650));
             }
             
             try {
                 const options = { method };
-                
-                // Authentication is handled by browser cookies automatically
                 
                 if (body) {
                     if (body instanceof FormData) {
@@ -431,7 +407,6 @@
                     }
                     testResults.push({ url, method, status: response.status, success: true });
                     
-                    // Show success in iframe overlay
                     if (showVisual || url.startsWith('/admin') || url.startsWith('/auth') || url === '/') {
                         updateIframeOverlay(`SUCCESS ${method} ${url}`);
                     }
@@ -441,7 +416,6 @@
                     log(`FAILED ${method} ${url} (${response.status}): ${responseData}`, 'error');
                     testResults.push({ url, method, status: response.status, success: false, error: responseData });
                     
-                    // Show error in iframe overlay
                     if (showVisual || url.startsWith('/admin') || url.startsWith('/auth') || url === '/') {
                         updateIframeOverlay(`FAILED ${method} ${url}`);
                     }
@@ -452,7 +426,6 @@
                 log(`ERROR ${method} ${url}: ${error.message}`, 'error');
                 testResults.push({ url, method, success: false, error: error.message });
                 
-                // Show error in iframe overlay
                 if (showVisual || url.startsWith('/admin') || url.startsWith('/auth') || url === '/') {
                     updateIframeOverlay(`ERROR ${method} ${url}`);
                 }
@@ -462,35 +435,41 @@
         }
 
         async function runAllTests() {
+            testAborted = false;
+            document.getElementById('runAllBtn').style.display = 'none';
+            document.getElementById('stopBtn').style.display = 'inline-block';
+            
             log("Starting CMS201 comprehensive test suite...");
             clearLog();
             updateIframeOverlay("Starting comprehensive test suite...");
             
-            // Step 0: Show home page
+            try {
+            
+            checkAbort();
             log("Navigating to home page...");
             navigateIframe('/');
-            await new Promise(resolve => setTimeout(resolve, 2200)); // 10% slower
+            await new Promise(resolve => setTimeout(resolve, 2200));
             
-            // Step 0.5: Demonstrate Google OAuth blocking
+            checkAbort();
             log("Demonstrating Google OAuth iframe blocking...");
             updateIframeOverlay("Attempting to load Google OAuth in iframe...");
             navigateIframe('/auth/login');
-            await new Promise(resolve => setTimeout(resolve, 3300)); // 10% slower
+            await new Promise(resolve => setTimeout(resolve, 3300));
             
             log("Google OAuth blocks iframe embedding (X-Frame-Options: DENY)", 'warning');
             log("This is why we need the login simulator for testing", 'info');
             updateIframeOverlay("Google OAuth blocked - using simulator instead");
-            await new Promise(resolve => setTimeout(resolve, 2200)); // 10% slower
+            await new Promise(resolve => setTimeout(resolve, 2200));
             
-            // Navigate back to home
+            checkAbort();
             log("Navigating back to continue testing...");
             navigateIframe('/');
-            await new Promise(resolve => setTimeout(resolve, 1650)); // 10% slower
+            await new Promise(resolve => setTimeout(resolve, 1650));
             
-            // Step 1: Check real authentication status
+            checkAbort();
             log("Checking if user is already authenticated...");
             updateIframeOverlay("Checking authentication status...");
-            const isAuthenticated = await checkRealAuthentication();
+            const isAuthenticated = await checkAuth(true);
             
             if (!isAuthenticated) {
                 log("No authenticated user found!", 'error');
@@ -505,52 +484,47 @@
             
             log("User authenticated - continuing with tests...", 'success');
 
-            // Step 1.5: Comprehensive admin interface testing
-            log("Starting comprehensive admin interface testing...");
-            await simulateAdminInteractions();
-            await new Promise(resolve => setTimeout(resolve, 1650)); // 10% slower
-
-            // Step 2: Test public endpoints with visual navigation
-            log("Testing public API endpoints...");
-            navigateIframe('/');
+            checkAbort();
+            await testAdminInteractive();
             await new Promise(resolve => setTimeout(resolve, 1650));
-            await testEndpoint('/api/snap', 'GET', null, 'Getting current state snapshot', true);
+
+            checkAbort();
+            await testPublicEndpoints();
             await new Promise(resolve => setTimeout(resolve, 1100));
-            await testEndpoint('/api/snap/notNull', 'GET', null, 'Getting filtered state snapshot');
-            await new Promise(resolve => setTimeout(resolve, 1100));
+            checkAbort();
             await testEndpoint('/api/uploaded-images', 'GET', null, 'Fetching uploaded images list');
             await new Promise(resolve => setTimeout(resolve, 1100));
 
-            // Step 3: Test remaining authenticated endpoints
+            checkAbort();
             log("Testing remaining authenticated API endpoints...");
             await testEndpoint('/api/events', 'GET', null, 'Fetching all events (including form-created ones)');
             await new Promise(resolve => setTimeout(resolve, 1100));
 
-            // Test image upload URL generation
+            checkAbort();
             await testEndpoint('/api/uploadImageURL?path=test-image', 'GET', null, 'Getting image upload URL');
             await new Promise(resolve => setTimeout(resolve, 1100));
 
-            // Test backup trigger
+            checkAbort();
             await testEndpoint('/api/backup', 'GET', null, 'Triggering GitHub backup');
             await new Promise(resolve => setTimeout(resolve, 1100));
 
-            // Step 4: Test GitHub sync endpoints (these require GitHub PAT)
+            checkAbort();
             log("Testing GitHub sync endpoints...");
             await testEndpoint('/api/github/syncStart', 'GET', null, 'Starting GitHub sync');
             await new Promise(resolve => setTimeout(resolve, 1100));
             
-            // Step 5: Test file reading endpoints
+            checkAbort();
             log("Testing file reading endpoints...");
             await testEndpoint('/api/readFile/snap.json', 'GET', null, 'Reading snap.json file');
             await new Promise(resolve => setTimeout(resolve, 1100));
 
-            // Step 6: Verify all created content
+            checkAbort();
             log("Verifying all created content...");
             updateIframeOverlay("Verifying created content...");
             await testEndpoint('/api/events', 'GET', null, 'Final verification of all events');
             await new Promise(resolve => setTimeout(resolve, 1100));
 
-            // Step 7: Final comprehensive navigation demo
+            checkAbort();
             log("Final comprehensive navigation demonstration...");
             updateIframeOverlay("Final demo: Complete CMS tour");
             
@@ -562,13 +536,13 @@
             ];
             
             for (const page of demoPages) {
+                checkAbort();
                 log(`Final demo: ${page.desc}`);
                 updateIframeOverlay(`Demo: ${page.desc}`);
                 navigateIframe(page.url);
-                await new Promise(resolve => setTimeout(resolve, 2200)); // 10% slower
+                await new Promise(resolve => setTimeout(resolve, 2200));
             }
 
-            // Step 8: Generate comprehensive summary
             log("Comprehensive Test Summary:");
             const successful = testResults.filter(r => r.success).length;
             const failed = testResults.filter(r => !r.success).length;
@@ -580,18 +554,27 @@
             
             if (failed === 0) {
                 log("All tests passed! CMS is fully functional with admin interactions.", 'success');
-                navigateIframe('/admin'); // End on admin page
+                navigateIframe('/admin');
             } else {
                 log("Some tests failed. Review the detailed log above.", 'warning');
             }
+            } catch (error) {
+                if (error.message === 'Tests aborted by user') {
+                    log("Test suite aborted", 'warning');
+                } else {
+                    log(`Test suite error: ${error.message}`, 'error');
+                }
+            } finally {
+                document.getElementById('stopBtn').style.display = 'none';
+                document.getElementById('runAllBtn').style.display = 'inline-block';
+            }
         }
 
-        // Test individual endpoint categories
         async function testPublicEndpoints() {
-            log("Testing public endpoints only...");
+            log("Testing public endpoints...");
             updateIframeOverlay("Testing public endpoints...");
             navigateIframe('/');
-            await new Promise(resolve => setTimeout(resolve, 1650)); // 10% slower
+            await new Promise(resolve => setTimeout(resolve, 1650));
             await testEndpoint('/api/snap', 'GET', null, 'Public snap endpoint', true);
             await new Promise(resolve => setTimeout(resolve, 1100));
             await testEndpoint('/api/snap/notNull', 'GET', null, 'Public filtered snap');
@@ -613,7 +596,6 @@
             await testEndpoint('/api/addEvent', 'POST', {test: Date.now()}, 'Add event');
         }
 
-        // Interactive admin testing function
         async function testAdminInteractive() {
             log("Starting interactive admin testing...");
             const isAuth = await checkAuth();
@@ -623,11 +605,9 @@
                 return;
             }
             
-            // Use the same comprehensive admin testing as runAllTests
             await simulateAdminInteractions();
         }
 
-        // Initialize
         log("CMS201 Test Suite Ready");
         log("Click 'Run All Tests' to begin comprehensive testing");
         log("Authenticate via /auth/login for full functionality");

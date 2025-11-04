@@ -95,7 +95,10 @@ const UNSECURE_PATHS = {
 				"Set-Cookie": `session_token=${tokenData.id_token}; HttpOnly; Secure; Path=/; Max-Age=7200; SameSite=Lax`,
 			}
 		});
-	}
+	},
+	"GET /test": function (req, env, ctx, user) {
+		return env.ASSETS.fetch(req);
+	},
 };
 
 const GITHUB_SECURE_PATHS = {
@@ -117,9 +120,6 @@ const SECURE_PATHS = {
 		return await DB(env).getEvents(req.url.pathname.split("/")[3]);
 	},
 	"GET /admin": function (req, env, ctx, user) {
-		return env.ASSETS.fetch(req);
-	},
-	"GET /test": function (req, env, ctx, user) {
 		return env.ASSETS.fetch(req);
 	},
 	"GET /data": async function (req, env, ctx, user) {
@@ -172,7 +172,7 @@ const SECURE_PATHS = {
 		const { image_server: { account_id, api_token } } = env.settings;
 		const id = req.url.searchParams.get("path");
 		if (!id)
-			throw new Error("error. /api/uploadImageURL?id= is required.");
+			throw new Error("error. /api/uploadImageURL?path= is required."); // Oussama: fixed error message: changed from ?id= to ?path=
 		const formData = new FormData();
 		const metadata = {};
 		formData.append("id", id);
