@@ -17,17 +17,18 @@ A lightweight, serverless Content Management System built on Cloudflare Workers 
 ```
 cms201/
 ├── .github/workflows/
-│   ├── syncWorkerFiles.yml    # Daily backup automation
-│   └── syncWorkerFiles.sh     # Sync script
+│   ├── syncWorkerFiles.yml     # Daily backup automation
+│   └── syncWorkerFiles.sh      # Sync script
 ├── public/
-│   ├── admin/index.html       # Admin interface
-│   ├── test.html             # Comprehensive testing suite
-│   └── data/                 # Static data files
+│   ├── index.html              # Main entry point
+│   ├── admin/index.html        # Admin interface
+│   ├── test/index.html         # Comprehensive testing suite
+│   └── data/                   # Static data files
 ├── src/
-│   ├── index.js              # Main worker entry point
-│   └── EventSnapsDO.js       # Durable Object implementation
-├── wrangler.jsonc            # Cloudflare Worker configuration
-└── .dev.vars                 # Local environment variables
+│   ├── index.js                # Main worker entry point
+│   └── EventSnapsDO.js         # Durable Object implementation
+├── wrangler.jsonc              # Cloudflare Worker configuration
+└── .dev.vars                   # Local environment variables
 ```
 
 ## Quick Start
