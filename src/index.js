@@ -88,16 +88,13 @@ const UNSECURE_PATHS = {
 			return new Response(`Authentication Failed!`, { status: 401 });
 		const tokenData = await tokenRes.json();
 		//todo doesn't the tokenData contain the state too? should we not read it from there?
-		
+
 		return new Response(null, {
 			status: 302, headers: {
 				"Location": state,
 				"Set-Cookie": `session_token=${tokenData.id_token}; HttpOnly; Secure; Path=/; Max-Age=7200; SameSite=Lax`,
 			}
 		});
-	},
-	"GET /test": function (req, env, ctx, user) {
-		return env.ASSETS.fetch(req);
 	},
 };
 
@@ -139,6 +136,8 @@ const SECURE_PATHS = {
 		const file = formData.get("file");
 		if (!(file instanceof File))
 			throw new Error("You can only add a file.");
+		if (file.size > 10 * 1024 ** 2)
+			throw new Error("File size exceeds 10MB limit.");
 		const filename = formData.get("filename") || file.name;
 		if (!filename)
 			throw new Error("Filename is required.");
@@ -202,7 +201,7 @@ function settings(env) {
 	return {
 		origin: env.ORIGIN,
 		//todo 1. bug! env.OAUTH_USERS which is an array of emails. instead of USERS.
-		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
+		// users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
 		oauth_users: env.OAUTH_USERS.split(";"), // Oussama: Added this line
 		google: {
 			client_id: env.GOOGLE_ID,
