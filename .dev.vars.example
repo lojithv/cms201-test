@@ -1,9 +1,6 @@
 # Local development origin
 ORIGIN="http://127.0.0.1:3033"
 
-# User authentication (format: email:role;email:role)
-USERS="your-email@gmail.com:admin"
-
 OAUTH_USERS="your-email@gmail.com"
 
 # Google OAuth Configuration

@@ -60,7 +60,8 @@ if [[ -n "$gitStatus" && "$COMMIT" == "true" ]]; then
   echo "Changes committed and pushed."
 fi
 
-
+# It is possible to move this operation to the constructor in the DurableObject.
+# But not sure that this is better..
 echo "6. Calling ${CF_DOMAIN}/api/github/syncEnd"
 response=$(curl -sS \
   -X POST \
