@@ -9,8 +9,7 @@
 		"directory": "./public",
 		"run_worker_first": [
 			"/admin/*",
-			"/data/*",
-			"/test/*"
+			"/data/*"
 		]
 	},
 	"durable_objects": {
