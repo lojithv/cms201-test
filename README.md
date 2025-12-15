@@ -44,7 +44,6 @@ cms201/
    ```bash
    git clone <your-repo>
    cd cms201
-   npm install -g wrangler
    ```
 
 2. **Configure environment variables:**
