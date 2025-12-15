@@ -1,0 +1,23 @@
+# Local development origin
+ORIGIN="http://127.0.0.1:3033"
+
+OAUTH_USERS="your-email@gmail.com"
+
+# Google OAuth Configuration
+GOOGLE_ID="your-google-client-id.apps.googleusercontent.com"
+GOOGLE_SECRET="GOCSPX-your-google-client-secret"
+GOOGLE_REDIRECT="http://localhost:3033/auth/callback"
+
+# GitHub Integration
+GITHUB_REPO="username/reponame"
+GITHUB_WORKFLOW="https://api.github.com/repos/username/reponame/actions/workflows/syncWorkerFiles.yml/dispatches"
+GITHUB_PAT="github_pat_your_personal_access_token_here"
+GITHUB_TTL="300"
+
+# Cloudflare Image Server (optional)
+IMAGE_SERVER_ACCOUNT_ID="your-cloudflare-account-id"
+IMAGE_SERVER_API_TOKEN="your-cloudflare-api-token"
+
+# Production values (uncomment and modify for production deployment)
+# GOOGLE_REDIRECT="https://your-worker.workers.dev/auth/callback"
+# CF_DOMAIN="your-worker.workers.dev"

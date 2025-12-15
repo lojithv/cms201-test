@@ -87,14 +87,13 @@ const UNSECURE_PATHS = {
 		if (!tokenRes.ok)
 			return new Response(`Authentication Failed!`, { status: 401 });
 		const tokenData = await tokenRes.json();
-		//todo doesn't the tokenData contain the state too? should we not read it from there?
 		return new Response(null, {
 			status: 302, headers: {
 				"Location": state,
 				"Set-Cookie": `session_token=${tokenData.id_token}; HttpOnly; Secure; Path=/; Max-Age=7200; SameSite=Lax`,
 			}
 		});
-	}
+	},
 };
 
 const GITHUB_SECURE_PATHS = {
@@ -135,6 +134,8 @@ const SECURE_PATHS = {
 		const file = formData.get("file");
 		if (!(file instanceof File))
 			throw new Error("You can only add a file.");
+		if (file.size > 10 * 1024 ** 2)
+			throw new Error("File size exceeds 10MB limit.");
 		const filename = formData.get("filename") || file.name;
 		if (!filename)
 			throw new Error("Filename is required.");
@@ -153,7 +154,7 @@ const SECURE_PATHS = {
 				'Authorization': `Bearer ${env.settings.github.pat}`,
 				'X-GitHub-Api-Version': '2022-11-28',
 				"Accept": "application/vnd.github+json",
-				'User-Agent': 'cms201-worker/1.0'
+				'User-Agent': 'project201-worker/1.0'
 			},
 			body: JSON.stringify({ ref: 'main' }),
 		});
@@ -168,7 +169,7 @@ const SECURE_PATHS = {
 		const { image_server: { account_id, api_token } } = env.settings;
 		const id = req.url.searchParams.get("path");
 		if (!id)
-			throw new Error("error. /api/uploadImageURL?id= is required.");
+			throw new Error("error. /api/uploadImageURL?path= is required.");
 		const formData = new FormData();
 		const metadata = {};
 		formData.append("id", id);
@@ -197,8 +198,7 @@ function getEndpoint(req, PATHS) {
 function settings(env) {
 	return {
 		origin: env.ORIGIN,
-		//todo 1. bug! env.OAUTH_USERS which is an array of emails. instead of USERS.
-		users: Object.fromEntries(env.USERS.split(";").map(up => up.split(":"))),
+		oauth_users: env.OAUTH_USERS.split(";"),
 		google: {
 			client_id: env.GOOGLE_ID,
 			client_secret: env.GOOGLE_SECRET,
@@ -208,7 +208,6 @@ function settings(env) {
 			repo: env.GITHUB_REPO,
 			pat: env.GITHUB_PAT,
 			workflow: env.GITHUB_WORKFLOW,
-			// coder: await AesGcmHelper.make(env.GITHUB_PASSPHRASE),
 			ttl: Number(env.GITHUB_TTL) * 60 * 1000,
 		},
 		image_server: {
@@ -242,9 +241,8 @@ async function onFetch(request, env, ctx) {
 				const authHeader = request.headers.get("Authorization");
 				if (!authHeader?.startsWith("Bearer "))
 					throw "Missing Authorization Bearer token";
-				// For now, just check if token matches PAT - in production you might want stronger validation
 				const token = authHeader.split("Bearer ")[1];
-				if (token !== env.settings.github.pat)
+				if (token !== env.settings.github.pat)  //we might want stronger validation in production
 					throw "Invalid GitHub token";
 			}
 		}
@@ -256,8 +254,9 @@ async function onFetch(request, env, ctx) {
 				if (payload instanceof Promise)
 					payload = await payload;
 				user = payload?.email;
-				//to do 2. bug! check that user is in env.OAUTH_USERS
 				if (!user)
+					endPoint = UNSECURE_PATHS["GET /auth/login"];
+				else if (!env.settings.oauth_users.includes(user))
 					endPoint = UNSECURE_PATHS["GET /auth/login"];
 			}
 		}
