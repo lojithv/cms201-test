@@ -108,9 +108,6 @@ Below is a receipe for how to replicate this project from scratch. It involves a
 
 ## .dev.vars
 
-<!-- Oussama: Added <username> to GITHUB_WORKFLOW url -->
-<!-- Oussama: Added ${username} to <cloudfare link> -->
-
 ```
 ORIGIN="http://127.0.0.1:3033"
 OAUTH_USERS="orstavik77@gmail.com"
@@ -208,7 +205,6 @@ at this point, should we make the .dev.vars file?? In one place.
 1. change the project name in `wrangler.jsonc` and `README.md` to `${projectname}`.
 2. commit the repo to github as a new repo with the name ${projectname}.
 2. Wait for 1min??
-<!-- Update "snapshot.json" to "snap.json" -->
 3. fetch `https://${projectname}.${username}.workers.dev/startup`. Make sure that it returns the same state as in the snap.json inside make sure that it returns the same value as was in the `data` branch commit.
 
 ## Data structure
