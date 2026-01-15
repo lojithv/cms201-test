@@ -122,15 +122,14 @@ CREATE TABLE IF NOT EXISTS files (
     const pulled = { snap: false, files: false };
     const errors = [];
 
-    // Pull snap.json from GitHub
+    // Pull snap.json from GitHub - replace local with remote entirely
     try {
       const snapData = await pullLatestChanges(pat, rootUrl, "public/data/snap.json");
       if (snapData && snapData.content) {
         const remoteSnapStr = decodeURIComponent(escape(atob(snapData.content.replace(/\s/g, ''))));
         const remoteSnap = JSON.parse(remoteSnapStr);
-        // Merge remote snap with local snap (remote first, then local overwrites)
-        // This ensures we get all remote changes, but local uncommitted changes take precedence
-        this.#currentState.snap = ObjectAssignAssign(remoteSnap, this.#currentState.snap);
+        // Replace local snap entirely with remote snap
+        this.#currentState.snap = remoteSnap;
         pulled.snap = true;
       }
     } catch (err) {
@@ -140,15 +139,14 @@ CREATE TABLE IF NOT EXISTS files (
       }
     }
 
-    // Pull files.json from GitHub
+    // Pull files.json from GitHub - replace local with remote entirely
     try {
       const filesData = await pullLatestChanges(pat, rootUrl, "public/data/files.json");
       if (filesData && filesData.content) {
         const remoteFilesStr = decodeURIComponent(escape(atob(filesData.content.replace(/\s/g, ''))));
         const remoteFiles = JSON.parse(remoteFilesStr);
-        // Merge remote files list with local files list
-        const localFiles = this.#currentState.files || [];
-        this.#currentState.files = Array.from(new Set([...remoteFiles, ...localFiles])).sort();
+        // Replace local files list entirely with remote
+        this.#currentState.files = remoteFiles;
         pulled.files = true;
       }
     } catch (err) {
