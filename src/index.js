@@ -1,5 +1,6 @@
 import { getAuthGoogleUser } from "./googleAuth.js";
 export { EventsSnaps } from "./EventSnapsDO.js";
+import { commit } from "./GitHubCommit.js";
 
 const DB = env => env["EVENTS_SNAPS"].get(env["EVENTS_SNAPS"].idFromName("foo"));
 
@@ -147,20 +148,49 @@ const SECURE_PATHS = {
 		return await DB(env).addFile(user, { filename, contentType, data: uint8Array });
 	},
 	"GET /api/backup": async function (req, env, ctx, user) {
-		const res = await fetch(env.settings.github.workflow, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${env.settings.github.pat}`,
-				'X-GitHub-Api-Version': '2022-11-28',
-				"Accept": "application/vnd.github+json",
-				'User-Agent': 'project201-worker/1.0'
-			},
-			body: JSON.stringify({ ref: 'main' }),
-		});
-		if (!res.ok)
-			throw new Error("Error triggering backup workflow: " + await res.text());
-		return "ok. backup initiated."
+		const filesStr = await DB(env).syncStart();
+		if (!filesStr) return "nothing to sync.";
+		const files = filesStr.split(" ");
+
+		const rootUrl = `https://api.github.com/repos/${env.settings.github.repo}/contents`;
+		const PAT = env.settings.github.pat;
+
+		for (const file of files) {
+			if (file === "snap.json") continue; // Handle snap.json separately to merge
+
+			const res = await DB(env).readFile(file);
+			if (!res.ok) {
+				console.error(`Failed to read file ${file} from DO: ${res.status}`);
+				continue;
+			}
+			const content = await res.text();
+			const githubPath = `public/data/${file}`;
+
+			await commit(PAT, rootUrl, githubPath, null, null, content);
+		}
+
+		// Update snap.json with merge logic
+		const snapRes = await DB(env).readFile("snap.json");
+		if (snapRes.ok) {
+			const snapContent = await snapRes.text();
+			await commit(PAT, rootUrl, "public/data/snap.json", null, (newS, oldS) => {
+				if (!oldS) return newS;
+				const old = JSON.parse(oldS);
+				const current = JSON.parse(newS);
+				return JSON.stringify({ ...old, ...current }, null, 2);
+			}, snapContent);
+		}
+
+		// Update files.json using merge logic
+		const newFiles = files.filter(f => f !== "snap.json");
+		await commit(PAT, rootUrl, "public/data/files.json", null, (newFListJson, oldFListJson) => {
+			const existingFiles = oldFListJson ? JSON.parse(oldFListJson) : [];
+			const newFilesList = JSON.parse(newFListJson);
+			return JSON.stringify(Array.from(new Set([...existingFiles, ...newFilesList])).sort(), null, 2);
+		}, JSON.stringify(newFiles));
+
+		await DB(env).syncEnd(filesStr);
+		return "ok. backup completed.";
 	},
 	"GET /auth/checkLogin": async function (req, env, ctx, user) {
 		return "ok. Already authenticated. " + user;
