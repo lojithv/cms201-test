@@ -1,6 +1,5 @@
 import { getAuthGoogleUser } from "./googleAuth.js";
 export { EventsSnaps } from "./EventSnapsDO.js";
-import { commit } from "./GitHubCommit.js";
 
 const DB = env => env["EVENTS_SNAPS"].get(env["EVENTS_SNAPS"].idFromName("foo"));
 
@@ -97,19 +96,6 @@ const UNSECURE_PATHS = {
 	},
 };
 
-const GITHUB_SECURE_PATHS = {
-	"GET /api/github/syncStart": async function (req, env) {
-		return await DB(env).syncStart();
-	},
-	"POST /api/github/syncEnd": async function (req, env) {
-		const files = await req.text();
-		return await DB(env).syncEnd(files);
-	},
-	"GET /api/github/readFile": async function (req, env) {
-		const path = req.url.pathname.replace("/api/github/readFile/", "").split("/").map(decodeURIComponent).join("/");
-		return await DB(env).readFile(path);
-	},
-};
 
 const SECURE_PATHS = {
 	"GET /api/events": async function (req, env, ctx) {
@@ -147,50 +133,20 @@ const SECURE_PATHS = {
 		const uint8Array = new Uint8Array(arrayBuffer);
 		return await DB(env).addFile(user, { filename, contentType, data: uint8Array });
 	},
+	"GET /api/pull": async function (req, env, ctx, user) {
+		// Pull latest changes from GitHub (get updates from other collaborators)
+		const result = await DB(env).pull(env.settings.github);
+		return result;
+	},
+	"GET /api/sync": async function (req, env, ctx, user) {
+		// Full sync cycle: Pull → Commit → Cleanup → Pull again (all via GitHub REST API)
+		const result = await DB(env).sync(env.settings.github);
+		return result;
+	},
 	"GET /api/backup": async function (req, env, ctx, user) {
-		const filesStr = await DB(env).syncStart();
-		if (!filesStr) return "nothing to sync.";
-		const files = filesStr.split(" ");
-
-		const rootUrl = `https://api.github.com/repos/${env.settings.github.repo}/contents`;
-		const PAT = env.settings.github.pat;
-
-		for (const file of files) {
-			if (file === "snap.json") continue; // Handle snap.json separately to merge
-
-			const res = await DB(env).readFile(file);
-			if (!res.ok) {
-				console.error(`Failed to read file ${file} from DO: ${res.status}`);
-				continue;
-			}
-			const content = await res.text();
-			const githubPath = `public/data/${file}`;
-
-			await commit(PAT, rootUrl, githubPath, null, null, content);
-		}
-
-		// Update snap.json with merge logic
-		const snapRes = await DB(env).readFile("snap.json");
-		if (snapRes.ok) {
-			const snapContent = await snapRes.text();
-			await commit(PAT, rootUrl, "public/data/snap.json", null, (newS, oldS) => {
-				if (!oldS) return newS;
-				const old = JSON.parse(oldS);
-				const current = JSON.parse(newS);
-				return JSON.stringify({ ...old, ...current }, null, 2);
-			}, snapContent);
-		}
-
-		// Update files.json using merge logic
-		const newFiles = files.filter(f => f !== "snap.json");
-		await commit(PAT, rootUrl, "public/data/files.json", null, (newFListJson, oldFListJson) => {
-			const existingFiles = oldFListJson ? JSON.parse(oldFListJson) : [];
-			const newFilesList = JSON.parse(newFListJson);
-			return JSON.stringify(Array.from(new Set([...existingFiles, ...newFilesList])).sort(), null, 2);
-		}, JSON.stringify(newFiles));
-
-		await DB(env).syncEnd(filesStr);
-		return "ok. backup completed.";
+		// Alias for /api/sync (backwards compatibility)
+		const result = await DB(env).sync(env.settings.github);
+		return result;
 	},
 	"GET /auth/checkLogin": async function (req, env, ctx, user) {
 		return "ok. Already authenticated. " + user;
@@ -237,8 +193,6 @@ function settings(env) {
 		github: {
 			repo: env.GITHUB_REPO,
 			pat: env.GITHUB_PAT,
-			workflow: env.GITHUB_WORKFLOW,
-			ttl: Number(env.GITHUB_TTL) * 60 * 1000,
 		},
 		image_server: {
 			account_id: env.IMAGE_SERVER_ACCOUNT_ID,
@@ -265,17 +219,6 @@ async function onFetch(request, env, ctx) {
 			if (endPoint && !request.headers.get("Referer")?.startsWith(request.url.origin))
 				throw "CORS error: Referer not same site";
 		}									//validate end
-		if (!endPoint) {
-			endPoint = getEndpoint(request, GITHUB_SECURE_PATHS);
-			if (endPoint) {
-				const authHeader = request.headers.get("Authorization");
-				if (!authHeader?.startsWith("Bearer "))
-					throw "Missing Authorization Bearer token";
-				const token = authHeader.split("Bearer ")[1];
-				if (token !== env.settings.github.pat)  //we might want stronger validation in production
-					throw "Invalid GitHub token";
-			}
-		}
 		let user;
 		if (!endPoint) {
 			endPoint = getEndpoint(request, SECURE_PATHS);
@@ -307,10 +250,12 @@ async function onFetch(request, env, ctx) {
 
 async function onSchedule(controller, env, ctx) {
 	env.settings ??= settings(env);
-	await SECURE_PATHS["GET /api/backup"](undefined, env, ctx);
+	// Direct GitHub sync via REST API (no GitHub Actions needed)
+	const result = await DB(env).sync(env.settings.github);
+	console.log("Scheduled sync result:", result);
 }
 
 export default {
 	fetch: onFetch,
-	// schedule: onSchedule,
+	scheduled: onSchedule,
 };

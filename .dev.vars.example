@@ -8,11 +8,9 @@ GOOGLE_ID="your-google-client-id.apps.googleusercontent.com"
 GOOGLE_SECRET="GOCSPX-your-google-client-secret"
 GOOGLE_REDIRECT="http://localhost:3033/auth/callback"
 
-# GitHub Integration
+# GitHub Integration (direct REST API sync - no GitHub Actions needed)
 GITHUB_REPO="username/reponame"
-GITHUB_WORKFLOW="https://api.github.com/repos/username/reponame/actions/workflows/syncWorkerFiles.yml/dispatches"
 GITHUB_PAT="github_pat_your_personal_access_token_here"
-GITHUB_TTL="300"
 
 # Cloudflare Image Server (optional)
 IMAGE_SERVER_ACCOUNT_ID="your-cloudflare-account-id"

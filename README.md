@@ -1,6 +1,6 @@
 # CMS201 - Micro CMS on Cloudflare Workers
 
-A lightweight, serverless Content Management System built on Cloudflare Workers with Durable Objects, featuring Google OAuth authentication, automatic GitHub backups, and real-time data synchronization.
+A lightweight, serverless Content Management System built on Cloudflare Workers with Durable Objects, featuring Google OAuth authentication, automatic GitHub backups via REST API, and real-time data synchronization.
 
 ## Architecture
 
@@ -9,16 +9,13 @@ A lightweight, serverless Content Management System built on Cloudflare Workers 
 - **Backend**: Cloudflare Workers (JavaScript runtime at the edge)
 - **Database**: Durable Objects with SQLite (persistent, in-memory)
 - **Authentication**: Google OAuth 2.0
-- **Backup**: Automated GitHub sync via Actions
+- **Backup**: Direct GitHub REST API sync (no GitHub Actions needed)
 - **File Storage**: Cloudflare Assets + GitHub repository
 
 ## Project Structure
 
 ```
 cms201/
-├── .github/workflows/
-│   ├── syncWorkerFiles.yml     # Daily backup automation
-│   └── syncWorkerFiles.sh      # Sync script
 ├── public/
 │   ├── index.html              # Main entry point
 │   ├── admin/index.html        # Admin interface
@@ -26,7 +23,8 @@ cms201/
 │   └── data/                   # Static data files
 ├── src/
 │   ├── index.js                # Main worker entry point
-│   └── EventSnapsDO.js         # Durable Object implementation
+│   ├── EventSnapsDO.js         # Durable Object implementation
+│   └── GitHubCommit.js         # GitHub REST API commit logic
 ├── wrangler.jsonc              # Cloudflare Worker configuration
 └── .dev.vars                   # Local environment variables
 ```
@@ -63,12 +61,29 @@ cms201/
    - **Admin Panel**: http://localhost:3033/admin
    - **Test Suite**: http://localhost:3033/test.html
 
-### Testing GitHub Sync Locally
+### Testing GitHub Sync
+The sync is done directly via GitHub REST API. No external scripts or GitHub Actions required.
+
+**Available endpoints (require authentication):**
+- `/api/pull` - Pull latest changes from GitHub (get updates from other collaborators)
+- `/api/sync` - Full sync cycle: Pull → Commit → Cleanup → Pull again
+- `/api/backup` - Alias for `/api/sync`
+
+**Sync cycle:**
+1. **Pull** - Fetch latest `snap.json` and `files.json` from GitHub, merge with local state
+2. **Commit** - Push local changes (events, files) to GitHub
+3. **Cleanup** - Delete synced data from Durable Object
+4. **Pull again** - Ensure we have the absolute latest state
+
+To test locally after logging in:
 ```bash
-CF_DOMAIN="http://127.0.0.1:3033" \
-CF_GH_SECRET="your_github_pat_token" \
-COMMIT="false" \
-bash .github/workflows/syncWorkerFiles.sh
+# Pull latest changes from collaborators:
+# Visit http://localhost:3033/api/pull
+
+# Full sync (pull + commit + pull):
+# Visit http://localhost:3033/api/sync
+
+# Or trigger via scheduled cron (every 6 hours by default)
 ```
 
 ## API Endpoints
@@ -91,12 +106,9 @@ bash .github/workflows/syncWorkerFiles.sh
 - `POST /api/addEvent` - Create new event
 - `POST /api/addFile` - Upload file
 - `GET /api/uploadImageURL` - Get image upload URL
-- `GET /api/backup` - Trigger GitHub backup
-
-### GitHub Sync Endpoints (Require PAT Token)
-- `GET /api/github/syncStart` - Start sync process
-- `POST /api/github/syncEnd` - Complete sync process  
-- `GET /api/github/readFile/{path}` - Read file from storage
+- `GET /api/pull` - Pull latest changes from GitHub (sync from other collaborators)
+- `GET /api/sync` - Full sync cycle: Pull → Commit → Cleanup → Pull again
+- `GET /api/backup` - Alias for `/api/sync` (backwards compatibility)
 
 ### Data Access Endpoints
 - `GET /data/{filename}` - Access stored files
@@ -116,16 +128,12 @@ GOOGLE_SECRET="GOCSPX-12345"
 GOOGLE_REDIRECT="http://127.0.0.1:3033/auth/callback"
 # GOOGLE_REDIRECT="<cloudflare link>/auth/callback"
 
-CF_DOMAIN="<projectname>.<username>.workers.dev"
 IMAGE_SERVER_ACCOUNT_ID="12345"
 IMAGE_SERVER_API_TOKEN="12345"
 
+# GitHub Integration (direct REST API sync - no GitHub Actions needed)
 GITHUB_REPO="orstavik/cms201"
-GITHUB_WORKFLOW="https://api.github.com/repos/<username>/<reponame>/actions/workflows/syncWorkerFiles/dispatches" 
-
-CF_GH_SECRET="github_pat_12345"
-GITHUB_TTL="300" 
-# GITHUB_TTL="5"00" # in prod 5 minutes, the allowed delay time for the cloudflare secret given github.
+GITHUB_PAT="github_pat_12345"
 ```
 
 ## 1. Manual steps
@@ -165,36 +173,26 @@ at this point, should we make the .dev.vars file?? In one place.
     2. Go to "Compute" > "Workers & Pages" > "Create application" > under "Workers" click "import a repository"
     3. Connect your github account, and authorize cloudflare to access your github account.
 
-7. Create a github workflow dispatch PAT token.
+7. Create a GitHub Personal Access Token (for direct REST API commits).
     1. Go to github.com/settings/tokens
     2. Click "Fine-grained tokens" > "Generate new token"
-    3. Name: `${projectname}-worker-events`
-    4. Select project repository ${projectname}$. (!!att!!)
-    5. permissions: `actions:write`, `contents:read` and `meta:read`
-    6. Expiration: `No expiration`
+    3. Name: `${projectname}-worker-sync`
+    4. Select project repository ${projectname}$
+    5. Permissions: `contents:read` and `contents:write`
+    6. Expiration: Choose appropriate duration
     7. Click "Generate token"
     8. Copy the token
 => github PAT
-8. Update github environment variable DOMAIN.
-    1. Go to https://github.com/${GITHUB_REPO}$/settings/secrets/actions
-    2. Click "New repository secret"
-        * Name: `CF_DOMAIN`, => value: `${projectname}.${username}.workers.dev`
-    3. Name: `production`
-    4. Click "Configure environment"
-    5. Click "Add variable"
-        * Name: `CF_DOMAIN`, => value: `${projectname}.${username}.workers.dev`
-    6. Click "Save variables"
-8. Update Cloudflare enviroment variables:
+
+8. Update Cloudflare environment variables:
     1. Go to dash.cloudflare.com
     2. Go to "Compute" > "Workers & Pages" > select your project > "Settings" > "Environment Variables"
     3. Click "Add variable"
-        * Name: `CF_GH_SECRET`, `Secret`, => value: `github PAT`
-        * Name: `OAUTH_CLIENT_ID`, `Secret`, => value: `google auth client id`
-        * Name: `OAUTH_CLIENT_SECRET`, `Secret`, => value: `google auth secret`
-        * Name: `EMAIL`, `Text`, => value: `gmail`
-        * Name: `PROJECT_NAME`, `Text`, => value: `${projectname}`
-        * Name: `CF_DOMAIN`, `Text`, => value: `${projectname}.${username}.workers.dev`
-        * Name: `REPO`, `Text`, => value: `${githubusername}/${projectname}`
+        * Name: `GITHUB_PAT`, `Secret`, => value: `github PAT`
+        * Name: `GITHUB_REPO`, `Text`, => value: `${githubusername}/${projectname}`
+        * Name: `GOOGLE_ID`, `Secret`, => value: `google auth client id`
+        * Name: `GOOGLE_SECRET`, `Secret`, => value: `google auth secret`
+        * Name: `OAUTH_USERS`, `Text`, => value: `${gmail}`
     4. Click "Save"
 
 * question: can we use the gmail with cloudflare for sending emails? can we somehow authorize cloudflare to use the gmail account as the sender when we use it's most recent .send() email feature? 

@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { ObjectAssignAssign, gzipString } from "./tools.js";
+import { commit, pullLatestChanges } from "./GitHubCommit.js";
 
 async function sha256base64UrlSafe(uint8Array) {
   const digest = await crypto.subtle.digest("SHA-256", uint8Array);
@@ -13,7 +14,6 @@ async function sha256base64UrlSafe(uint8Array) {
 export class EventsSnaps extends DurableObject {
 
   #currentState;
-  #syncStart;
 
   constructor(ctx, env) {
     super(ctx, env);
@@ -111,38 +111,189 @@ CREATE TABLE IF NOT EXISTS files (
     return `${eA.timestamp}_${eA.id}-${eZ.timestamp}_${eZ.id}`;
   }
 
-  syncStart() {
-    const res = this.sql.exec(`SELECT name, id FROM files ORDER BY id DESC`)
-      .toArray().map(r => `files/${r.id}/${encodeURIComponent(r.name)}`);
-    const eventFile = this.getEventFileName();
-    if (eventFile)
-      res.push(`events/${eventFile}.json.gz`);
-    if (!res.length)
-      return "";
-    res.push("snap.json");
-    return this.#syncStart = res.join(" ");
+  /**
+   * Pull latest state from GitHub and update local #currentState.
+   * This merges remote changes with local state for multi-collaborator sync.
+   */
+  async pull(githubSettings) {
+    const { repo, pat } = githubSettings;
+    const rootUrl = `https://api.github.com/repos/${repo}/contents`;
+
+    const pulled = { snap: false, files: false };
+    const errors = [];
+
+    // Pull snap.json from GitHub
+    try {
+      const snapData = await pullLatestChanges(pat, rootUrl, "public/data/snap.json");
+      if (snapData && snapData.content) {
+        const remoteSnapStr = decodeURIComponent(escape(atob(snapData.content.replace(/\s/g, ''))));
+        const remoteSnap = JSON.parse(remoteSnapStr);
+        // Merge remote snap with local snap (remote first, then local overwrites)
+        // This ensures we get all remote changes, but local uncommitted changes take precedence
+        this.#currentState.snap = ObjectAssignAssign(remoteSnap, this.#currentState.snap);
+        pulled.snap = true;
+      }
+    } catch (err) {
+      // 404 is ok - file might not exist yet
+      if (!err.message.includes("404")) {
+        errors.push({ type: "snap", error: err.message });
+      }
+    }
+
+    // Pull files.json from GitHub
+    try {
+      const filesData = await pullLatestChanges(pat, rootUrl, "public/data/files.json");
+      if (filesData && filesData.content) {
+        const remoteFilesStr = decodeURIComponent(escape(atob(filesData.content.replace(/\s/g, ''))));
+        const remoteFiles = JSON.parse(remoteFilesStr);
+        // Merge remote files list with local files list
+        const localFiles = this.#currentState.files || [];
+        this.#currentState.files = Array.from(new Set([...remoteFiles, ...localFiles])).sort();
+        pulled.files = true;
+      }
+    } catch (err) {
+      // 404 is ok - file might not exist yet
+      if (!err.message.includes("404")) {
+        errors.push({ type: "files", error: err.message });
+      }
+    }
+
+    // Clear cached snaps since state changed
+    this.#currentState.snaps = {};
+
+    return { 
+      status: errors.length === 0 ? "success" : "partial_failure",
+      message: `Pulled latest state from GitHub.`,
+      pulled,
+      errors: errors.length > 0 ? errors : undefined
+    };
   }
 
-  syncEnd(files) {
-    if (!this.#syncStart)
-      throw new Error("You must call syncStart before syncEnd.");
-    if (files !== this.#syncStart)
-      throw new Error("The files list does not match the one from syncStart.");
+  /**
+   * Unified GitHub sync cycle: Pull → Commit → Cleanup → Pull again
+   * Handles multi-collaborator scenarios by syncing in both directions.
+   */
+  async sync(githubSettings) {
+    const { repo, pat } = githubSettings;
+    const rootUrl = `https://api.github.com/repos/${repo}/contents`;
 
-    for (const f of files.split(" ")) {
-      const [type, one] = f.split("/");
-      if (type == "files")
-        this.sql.exec(`DELETE FROM files WHERE name = ?`, one);
-      else if (type == "events") {
-        const [[startTime, startId], [endTime, endId]] = one.split(".")[0].split("-").map(s => s.split("_"));
-        if (!startTime || !startId || !endTime || !endId)
-          throw new Error("Events filename file is corrupted: " + f);
-        this.sql.exec(`DELETE FROM events WHERE id BETWEEN ? AND ?`, startId, endId);
-      } else if (type == "snap.json") {
-      } else
-        throw new Error("Unknown file: " + filename);
+    // 1. Pull latest from GitHub first (get changes from other collaborators)
+    const pullResult = await this.pull(githubSettings);
+
+    // 2. Gather files to sync
+    const filesToSync = this.sql.exec(`SELECT id, name FROM files ORDER BY id DESC`).toArray();
+    const eventFileName = this.getEventFileName();
+    
+    if (!filesToSync.length && !eventFileName) {
+      return { 
+        status: "nothing_to_sync", 
+        message: "No new data to sync to GitHub.",
+        pulled: pullResult.pulled
+      };
     }
-    this.#syncStart = null;
+
+    const syncedItems = [];
+    const errors = [];
+
+    // 3. Commit each file to GitHub
+    for (const { id, name } of filesToSync) {
+      try {
+        const result = this.sql.exec(`SELECT data, mime FROM files WHERE id = ?`, id).next().value;
+        if (!result) continue;
+
+        const { data, mime } = result;
+        const githubPath = `public/data/files/${id}/${encodeURIComponent(name)}`;
+        
+        // Convert binary to base64 string for GitHub API
+        let content;
+        if (mime.startsWith("text/") || mime === "application/json") {
+          content = new TextDecoder().decode(data);
+        } else {
+          // Binary file - encode as base64 data URI or raw bytes
+          content = btoa(String.fromCharCode(...new Uint8Array(data)));
+        }
+
+        await commit(pat, rootUrl, githubPath, null, null, content);
+        syncedItems.push({ type: "file", id, name });
+      } catch (err) {
+        errors.push({ type: "file", id, name, error: err.message });
+      }
+    }
+
+    // 4. Commit events file (gzipped)
+    if (eventFileName) {
+      try {
+        const eventsRes = await this.readFile(`events/${eventFileName}.json.gz`);
+        if (eventsRes.ok) {
+          const gzipData = await eventsRes.arrayBuffer();
+          const content = btoa(String.fromCharCode(...new Uint8Array(gzipData)));
+          const githubPath = `public/data/events/${eventFileName}.json.gz`;
+          
+          await commit(pat, rootUrl, githubPath, null, null, content);
+          syncedItems.push({ type: "events", fileName: eventFileName });
+        }
+      } catch (err) {
+        errors.push({ type: "events", fileName: eventFileName, error: err.message });
+      }
+    }
+
+    // 5. Commit snap.json with merge logic
+    try {
+      const snapContent = JSON.stringify(this.#currentState.snap, null, 2);
+      await commit(pat, rootUrl, "public/data/snap.json", null, (newS, oldS) => {
+        if (!oldS) return newS;
+        const old = JSON.parse(oldS);
+        const current = JSON.parse(newS);
+        return JSON.stringify({ ...old, ...current }, null, 2);
+      }, snapContent);
+    } catch (err) {
+      errors.push({ type: "snap", error: err.message });
+    }
+
+    // 6. Commit files.json with merge logic
+    try {
+      const newFilesList = filesToSync.map(f => `files/${f.id}/${encodeURIComponent(f.name)}`);
+      if (eventFileName) newFilesList.push(`events/${eventFileName}.json.gz`);
+      
+      await commit(pat, rootUrl, "public/data/files.json", null, (newFListJson, oldFListJson) => {
+        const existingFiles = oldFListJson ? JSON.parse(oldFListJson) : [];
+        const newFiles = JSON.parse(newFListJson);
+        return JSON.stringify(Array.from(new Set([...existingFiles, ...newFiles])).sort(), null, 2);
+      }, JSON.stringify(newFilesList));
+    } catch (err) {
+      errors.push({ type: "files.json", error: err.message });
+    }
+
+    // 7. On success, cleanup synced data from DO
+    if (errors.length === 0) {
+      // Delete synced files from DO
+      for (const { id } of filesToSync) {
+        this.sql.exec(`DELETE FROM files WHERE id = ?`, id);
+      }
+
+      // Delete synced events from DO
+      if (eventFileName) {
+        const [[, startId], [, endId]] = eventFileName.split("-").map(s => s.split("_"));
+        this.sql.exec(`DELETE FROM events WHERE id BETWEEN ? AND ?`, startId, endId);
+      }
+
+      // 8. Pull again to ensure we have the absolute latest state
+      const finalPullResult = await this.pull(githubSettings);
+
+      return { 
+        status: "success", 
+        message: `Synced ${syncedItems.length} items to GitHub.`,
+        synced: syncedItems,
+        pulled: finalPullResult.pulled
+      };
+    } else {
+      return { 
+        status: "partial_failure", 
+        message: `Some items failed to sync.`,
+        synced: syncedItems,
+        errors 
+      };
+    }
   }
 
   getEvents(id) {
