@@ -163,20 +163,37 @@ CREATE TABLE IF NOT EXISTS files (
       status: errors.length === 0 ? "success" : "partial_failure",
       message: `Pulled latest state from GitHub.`,
       pulled,
+      currentSnap: this.#currentState.snap,
       errors: errors.length > 0 ? errors : undefined
     };
   }
 
   /**
-   * Unified GitHub sync cycle: Pull → Commit → Cleanup → Pull again
+   * Unified GitHub sync cycle: Merge remote → Commit local → Cleanup → Pull
    * Handles multi-collaborator scenarios by syncing in both directions.
+   * Unlike pull(), sync() merges remote with local (preserving local uncommitted changes).
    */
   async sync(githubSettings) {
     const { repo, pat } = githubSettings;
     const rootUrl = `https://api.github.com/repos/${repo}/contents`;
 
-    // 1. Pull latest from GitHub first (get changes from other collaborators)
-    const pullResult = await this.pull(githubSettings);
+    // 1. Merge remote into local (preserving local uncommitted changes)
+    // This is different from pull() which replaces entirely
+    const mergeResult = { snap: false, files: false };
+    try {
+      const snapData = await pullLatestChanges(pat, rootUrl, "public/data/snap.json");
+      if (snapData && snapData.content) {
+        const remoteSnapStr = decodeURIComponent(escape(atob(snapData.content.replace(/\s/g, ''))));
+        const remoteSnap = JSON.parse(remoteSnapStr);
+        // Merge: remote first, then local overwrites (local uncommitted changes take precedence)
+        this.#currentState.snap = ObjectAssignAssign(remoteSnap, this.#currentState.snap);
+        mergeResult.snap = true;
+      }
+    } catch (err) {
+      if (!err.message.includes("404")) {
+        console.error("Failed to merge remote snap:", err.message);
+      }
+    }
 
     // 2. Gather files to sync
     const filesToSync = this.sql.exec(`SELECT id, name FROM files ORDER BY id DESC`).toArray();
@@ -186,7 +203,7 @@ CREATE TABLE IF NOT EXISTS files (
       return { 
         status: "nothing_to_sync", 
         message: "No new data to sync to GitHub.",
-        pulled: pullResult.pulled
+        merged: mergeResult
       };
     }
 
@@ -275,14 +292,14 @@ CREATE TABLE IF NOT EXISTS files (
         this.sql.exec(`DELETE FROM events WHERE id BETWEEN ? AND ?`, startId, endId);
       }
 
-      // 8. Pull again to ensure we have the absolute latest state
-      const finalPullResult = await this.pull(githubSettings);
+      // 8. Pull again to ensure we have the absolute latest state (replace with remote)
+      await this.pull(githubSettings);
 
       return { 
         status: "success", 
         message: `Synced ${syncedItems.length} items to GitHub.`,
         synced: syncedItems,
-        pulled: finalPullResult.pulled
+        merged: mergeResult
       };
     } else {
       return { 
