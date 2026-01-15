@@ -131,12 +131,12 @@ CREATE TABLE IF NOT EXISTS files (
         // Replace local snap entirely with remote snap
         this.#currentState.snap = remoteSnap;
         pulled.snap = true;
+        pulled.snapSha = snapData.sha;
+      } else {
+        errors.push({ type: "snap", error: "No content in GitHub response", response: JSON.stringify(snapData).slice(0, 200) });
       }
     } catch (err) {
-      // 404 is ok - file might not exist yet
-      if (!err.message.includes("404")) {
-        errors.push({ type: "snap", error: err.message });
-      }
+      errors.push({ type: "snap", error: err.message });
     }
 
     // Pull files.json from GitHub - replace local with remote entirely
@@ -148,12 +148,12 @@ CREATE TABLE IF NOT EXISTS files (
         // Replace local files list entirely with remote
         this.#currentState.files = remoteFiles;
         pulled.files = true;
+        pulled.filesSha = filesData.sha;
+      } else {
+        errors.push({ type: "files", error: "No content in GitHub response", response: JSON.stringify(filesData).slice(0, 200) });
       }
     } catch (err) {
-      // 404 is ok - file might not exist yet
-      if (!err.message.includes("404")) {
-        errors.push({ type: "files", error: err.message });
-      }
+      errors.push({ type: "files", error: err.message });
     }
 
     // Clear cached snaps since state changed
