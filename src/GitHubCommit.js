@@ -61,7 +61,7 @@ export async function commit(PAT, rootUrl, path, lastSha, merge, logJson) {
         });
 
         if (putRes.ok) {
-            return await putRes.json();
+            return await pullLatestChanges(PAT, rootUrl, path);
         }
 
         if (putRes.status === 409 && merge) {
@@ -77,4 +77,17 @@ export async function commit(PAT, rootUrl, path, lastSha, merge, logJson) {
     }
 
     throw new Error(`Failed to commit ${path} after ${maxAttempts} attempts due to conflicts.`);
+}
+
+export async function pullLatestChanges(PAT, rootUrl, path) {
+    const url = `${rootUrl}/${path}`;
+    const headers = {
+        'Authorization': `Bearer ${PAT}`,
+        'User-Agent': 'project201-worker/1.0',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Accept': 'application/vnd.github+json'
+    };
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error(`Failed to pull latest changes for ${path}: ${res.status}`);
+    return await res.json();
 }
