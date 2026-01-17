@@ -1,7 +1,7 @@
 /* https://developers.cloudflare.com/workers/wrangler/configuration/ */
 {
 	/*"$schema": "node_modules/wrangler/config-schema.json", unnecessary*/
-	"name": "project201",
+	"name": "test-cloudflare-worker",
 	"main": "src/index.js",
 	"compatibility_date": "2025-04-23",
 	"assets": {
